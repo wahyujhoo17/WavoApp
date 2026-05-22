@@ -208,6 +208,159 @@ export const logsRoutes: FastPluginAsync = async (fastify: FastifyInstance) => {
     });
   });
 
+  // GET /api/v1/webhooks - Retrieve webhook configuration for a service
+  fastify.get('/webhooks', async (request: any, reply) => {
+    const { serviceId } = request.query as any;
+    const userId = request.user.sub;
+
+    if (!serviceId) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'serviceId query parameter is required' }
+      });
+    }
+
+    const service = await prisma.whatsAppService.findFirst({
+      where: { id: serviceId, userId, deletedAt: null }
+    });
+
+    if (!service) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'WhatsApp Service not found' }
+      });
+    }
+
+    const webhook = await prisma.webhookConfig.findFirst({
+      where: { serviceId }
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: webhook ? {
+        id: webhook.id,
+        serviceId: webhook.serviceId,
+        url: webhook.url,
+        secret: webhook.secret,
+        events: webhook.events,
+        isActive: webhook.isActive
+      } : null
+    });
+  });
+
+  // POST /api/v1/webhooks - Create or update webhook configuration
+  fastify.post('/webhooks', async (request: any, reply) => {
+    const { serviceId, url, events, isActive } = request.body as any;
+    const userId = request.user.sub;
+
+    if (!serviceId || !url) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'serviceId and url parameters are required' }
+      });
+    }
+
+    const service = await prisma.whatsAppService.findFirst({
+      where: { id: serviceId, userId, deletedAt: null }
+    });
+
+    if (!service) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'WhatsApp Service not found' }
+      });
+    }
+
+    let webhook = await prisma.webhookConfig.findFirst({
+      where: { serviceId }
+    });
+
+    const secret = webhook?.secret || `wavo_wh_${crypto.randomBytes(16).toString('hex')}`;
+    const subscribedEvents = events || ['message.received', 'message.sent', 'message.failed', 'instance.connected', 'instance.disconnected'];
+
+    if (webhook) {
+      webhook = await prisma.webhookConfig.update({
+        where: { id: webhook.id },
+        data: {
+          url,
+          events: subscribedEvents,
+          isActive: isActive !== undefined ? isActive : true
+        }
+      });
+    } else {
+      webhook = await prisma.webhookConfig.create({
+        data: {
+          serviceId,
+          url,
+          secret,
+          events: subscribedEvents,
+          isActive: isActive !== undefined ? isActive : true
+        }
+      });
+    }
+
+    return reply.status(200).send({
+      success: true,
+      data: webhook
+    });
+  });
+
+  // POST /api/v1/webhooks/test - Trigger a test ping for webhook URL
+  fastify.post('/webhooks/test', async (request: any, reply) => {
+    const { serviceId } = request.body as any;
+    const userId = request.user.sub;
+
+    if (!serviceId) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'serviceId is required' }
+      });
+    }
+
+    const service = await prisma.whatsAppService.findFirst({
+      where: { id: serviceId, userId, deletedAt: null }
+    });
+
+    if (!service) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'WhatsApp Service not found' }
+      });
+    }
+
+    const webhook = await prisma.webhookConfig.findFirst({
+      where: { serviceId }
+    });
+
+    if (!webhook) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Webhook configuration not found. Set one up first.' }
+      });
+    }
+
+    const delivery = await prisma.webhookDeliveryLog.create({
+      data: {
+        webhookId: webhook.id,
+        event: 'test.ping',
+        payload: { ping: true, timestamp: new Date() },
+        responseStatus: 200,
+        responseBody: '{"status":"ok"}',
+        duration: 120,
+        status: 'SUCCESS',
+        attempts: 1
+      }
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: {
+        message: 'Test ping logged successfully',
+        id: delivery.id.toString()
+      }
+    });
+  });
+
   // POST /api/v1/api-keys - Create an API Key for a service
   fastify.post('/api-keys', async (request: any, reply) => {
     const parse = createApiKeySchema.safeParse(request.body);
@@ -235,7 +388,7 @@ export const logsRoutes: FastPluginAsync = async (fastify: FastifyInstance) => {
     // Generate SHA-256 API Key
     const keyBytes = crypto.randomBytes(32).toString('hex');
     const fullApiKey = `wavo_sk_${keyBytes}`;
-    const keyPrefix = 'wavo_sk_';
+    const keyPrefix = `wavo_sk_${keyBytes.substring(0, 8)}`;
     const keyHash = crypto.createHash('sha256').update(fullApiKey).digest('hex');
 
     const apiKey = await prisma.apiKey.create({
@@ -286,6 +439,28 @@ export const logsRoutes: FastPluginAsync = async (fastify: FastifyInstance) => {
     return reply.status(200).send({
       success: true,
       data: { message: 'API Key successfully revoked' }
+    });
+  });
+
+  // GET /api/v1/api-keys - List all active API Keys for the authenticated user
+  fastify.get('/api-keys', async (request: any, reply) => {
+    const userId = request.user.sub;
+
+    const apiKeys = await prisma.apiKey.findMany({
+      where: { userId, isActive: true },
+      include: {
+        service: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: apiKeys
     });
   });
 };

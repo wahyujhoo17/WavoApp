@@ -56,6 +56,7 @@ ehthumbs.db
 Desktop.ini
 
 # Wavo Engine Local Storage & Build Outputs
+/storage
 /apps/api/storage
 /apps/api/dist
 /packages/database/dist

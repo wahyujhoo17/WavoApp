@@ -35,6 +35,57 @@ export const serviceRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     });
   });
 
+  // GET /api/v1/services/:id - Get details of a single WhatsApp instance
+  fastify.get('/:id', async (request: any, reply) => {
+    const serviceId = request.params.id;
+    const userId = request.user.sub;
+
+    const service = await prisma.whatsAppService.findFirst({
+      where: { id: serviceId, userId, deletedAt: null },
+      include: {
+        webhooks: true,
+        apiKeys: {
+          where: { isActive: true },
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    if (!service) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'WhatsApp Service not found' }
+      });
+    }
+
+    return reply.status(200).send({
+      success: true,
+      data: {
+        id: service.id,
+        name: service.name,
+        slug: service.slug,
+        status: service.status,
+        phoneNumber: service.phoneNumber,
+        createdAt: service.createdAt,
+        webhooks: service.webhooks.map(wh => ({
+          id: wh.id,
+          url: wh.url,
+          secret: wh.secret,
+          events: wh.events,
+          isActive: wh.isActive
+        })),
+        apiKeys: service.apiKeys.map(key => ({
+          id: key.id,
+          name: key.name,
+          keyPrefix: key.keyPrefix,
+          isActive: key.isActive,
+          createdAt: key.createdAt
+        }))
+      }
+    });
+  });
+
+
   // POST /api/v1/services - Create a new instance
   fastify.post('/', async (request: any, reply) => {
     const parse = createServiceSchema.safeParse(request.body);

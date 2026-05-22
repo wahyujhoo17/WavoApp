@@ -23,6 +23,11 @@ const logoutSchema = z.object({
   allDevices: z.boolean().default(false),
 }).optional();
 
+const updateProfileSchema = z.object({
+  fullName: z.string().min(2).optional(),
+  email: z.string().email().optional(),
+});
+
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   
   // POST /auth/register
@@ -317,6 +322,109 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       success: true,
       data: {
         message: 'Logged out successfully'
+      }
+    });
+  });
+
+  // PUT /auth/profile (Authenticated)
+  fastify.put('/profile', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
+    const parse = updateProfileSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid profile details',
+          details: parse.error.format()
+        }
+      });
+    }
+
+    const userId = request.user.sub;
+    const { fullName, email } = parse.data;
+
+    // Check if email already taken
+    if (email) {
+      const existingUser = await prisma.user.findFirst({
+        where: { email, NOT: { id: userId } }
+      });
+      if (existingUser) {
+        return reply.status(409).send({
+          success: false,
+          error: {
+            code: 'CONFLICT',
+            message: 'Email address is already in use by another user'
+          }
+        });
+      }
+    }
+
+    // Update user in DB
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(fullName && { fullName }),
+        ...(email && { email })
+      }
+    });
+
+    // Sign new access token with updated profile details
+    const accessToken = fastify.jwt.sign({
+      sub: updatedUser.id,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      plan: updatedUser.plan
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: {
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          fullName: updatedUser.fullName,
+          role: updatedUser.role,
+          plan: updatedUser.plan
+        },
+        accessToken
+      }
+    });
+  });
+
+  // GET /api/v1/auth/usage (Authenticated)
+  fastify.get('/usage', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
+    const userId = request.user.sub;
+
+    const messagesCount = await prisma.messageLog.count({
+      where: {
+        service: { userId, deletedAt: null },
+        direction: 'OUTBOUND',
+        status: { in: ['SENT', 'DELIVERED', 'READ'] }
+      }
+    });
+
+    const apiRequestsCount = await prisma.messageLog.count({
+      where: {
+        service: { userId, deletedAt: null }
+      }
+    });
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const dailyUsageCount = await prisma.messageLog.count({
+      where: {
+        service: { userId, deletedAt: null },
+        createdAt: { gte: startOfToday }
+      }
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: {
+        messagesSent: messagesCount,
+        apiRequests: apiRequestsCount,
+        dailyUsage: dailyUsageCount
       }
     });
   });
