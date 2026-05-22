@@ -134,12 +134,32 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const { email, password } = parse.data;
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.passwordHash || !user.isActive) {
+    if (!user) {
+      return reply.status(401).send({
+        success: false,
+        error: {
+          code: 'EMAIL_NOT_FOUND',
+          message: 'Email address is not registered.'
+        }
+      });
+    }
+
+    if (!user.passwordHash) {
       return reply.status(401).send({
         success: false,
         error: {
           code: 'UNAUTHORIZED',
-          message: 'Invalid email or password'
+          message: 'This account does not have an active password.'
+        }
+      });
+    }
+
+    if (!user.isActive) {
+      return reply.status(403).send({
+        success: false,
+        error: {
+          code: 'USER_SUSPENDED',
+          message: 'Your account is currently suspended. Please contact support.'
         }
       });
     }
@@ -149,8 +169,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(401).send({
         success: false,
         error: {
-          code: 'UNAUTHORIZED',
-          message: 'Invalid email or password'
+          code: 'INVALID_PASSWORD',
+          message: 'The password you entered is incorrect.'
         }
       });
     }
@@ -439,7 +459,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         success: false,
         error: {
           code: 'INVALID_PASSWORD',
-          message: 'Kata sandi saat ini yang Anda masukkan salah.'
+          message: 'The current password you entered is incorrect.'
         }
       });
     }
