@@ -63,6 +63,5 @@ Desktop.ini
 .env
 .env.local
 
-# Keep nested git repositories completely isolated
-# (Note: do not ignore `apps/engine` or `apps/landing` if they are part of this repo)
-
+# Landing page lives in its own repo: https://github.com/wahyujhoo17/wavo-landing-page
+apps/landing/
