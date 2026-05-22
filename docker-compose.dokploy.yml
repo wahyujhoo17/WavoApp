@@ -51,8 +51,8 @@ services:
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       NODE_ENV: production
       PORT: "4000"
-    ports:
-      - "4000:4000"
+    expose:
+      - "4000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,8 +76,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     depends_on:
       - api
 
