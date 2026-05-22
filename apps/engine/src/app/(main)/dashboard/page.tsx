@@ -89,6 +89,10 @@ export default function DashboardOverviewPage() {
   const { user } = useAuth();
   const [activeLines, setActiveLines] = React.useState({ current: true, prev: false });
   const [services, setServices] = React.useState<any[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = React.useState<string>('');
+  const [analytics, setAnalytics] = React.useState<any>(null);
+  const [recentLogs, setRecentLogs] = React.useState<any[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [dailyData, setDailyData] = React.useState<Array<{ date: string; label: string; outbound: number; inbound: number; total: number }>>([]);
 
   const fetchInitialData = async () => {
