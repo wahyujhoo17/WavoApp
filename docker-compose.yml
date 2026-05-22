@@ -40,12 +40,34 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
-    container_name: wavo-api
+      dockerfile: apps/monolith/Dockerfile
+    container_name: wavo-monolith
     ports:
       - "4000:4000"
-    env_file:
-      - ./apps/api/.env
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: "4000"
+      # Database points to postgres service in this compose
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/wavo?schema=public
+      DATABASE_POOL_SIZE: "20"
+      # Redis service
+      REDIS_URL: redis://redis:6379
+      # MinIO service (object storage)
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: minio_root
+      MINIO_SECRET_KEY: minio_password
+      MINIO_BUCKET: wavo-storage
+      MINIO_USE_SSL: "false"
+      # Application / Auth defaults (override in production)
+      FRONTEND_URL: http://localhost:3001
+      ADMIN_EMAIL: admin@wavo.dev
+      API_URL: http://localhost:4000
+      JWT_PRIVATE_KEY: wavo_secure_session_encryption_key_32_bytes_long_secret
+      JWT_PUBLIC_KEY: wavo_secure_session_encryption_key_32_bytes_long_secret
+      ENCRYPTION_KEY: wavo_secure_session_encryption_key_32_bytes_long_secret
+      BCRYPT_ROUNDS: "12"
     depends_on:
       - postgres
       - redis
