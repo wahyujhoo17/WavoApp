@@ -15,6 +15,20 @@ COPY tsconfig*.json ./
 # --no-audit: skip audit network calls
 # --no-fund: skip funding messages
 # --legacy-peer-deps: avoid peer dependency conflicts during install
+# When the build context is `./apps/api` (as in compose), copy files relative to that context.
+# Copy package files and tsconfig, configure npm for more resilient installs, then install
+COPY package*.json ./
+COPY tsconfig*.json ./
+
+# Configure npm to use the official registry, enable retries and allow unsafe-perm
+RUN npm config set registry https://registry.npmjs.org && \
+		npm config set fetch-retries 5 && \
+		npm config set fetch-retry-factor 2 && \
+		npm config set fetch-retry-mintimeout 1000 && \
+		npm config set fetch-retry-maxtimeout 60000 && \
+		npm config set unsafe-perm true && \
+		npm cache clean --force || true
+
 RUN set -eux; \
 	attempts=0; \
 	until [ $attempts -ge 3 ]; do \
