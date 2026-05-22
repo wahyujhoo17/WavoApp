@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { prisma, UserRole, UserPlan } from 'database';
+import { prisma, UserRole, UserPlan, ServiceStatus } from 'database';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { whatsAppServiceManager } from '../services/whatsapp.js';
 
 // Hook to verify administrative access
 const requireAdmin = async (request: any, reply: FastifyReply) => {
@@ -356,4 +357,103 @@ export async function adminRoutes(fastify: FastifyInstance) {
       });
     }
   });
+
+  // 7. DELETE /api/v1/admin/users/:id - Delete a user completely (Admin/Super Admin only)
+  fastify.delete('/users/:id', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const { id } = request.params;
+    const currentUser = request.user as any;
+
+    try {
+      const targetUser = await prisma.user.findUnique({
+        where: { id, deletedAt: null },
+      });
+
+      if (!targetUser) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'User not found.',
+          },
+        });
+      }
+
+      // Prevent self-deletion
+      if (targetUser.id === currentUser.sub) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'You cannot delete your own administrative account.',
+          },
+        });
+      }
+
+      // Role hierarchy check: only SUPER_ADMIN can delete ADMIN/SUPER_ADMIN users
+      if ((targetUser.role === UserRole.ADMIN || targetUser.role === UserRole.SUPER_ADMIN) && currentUser.role !== UserRole.SUPER_ADMIN) {
+        return reply.status(403).send({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Only a SUPER_ADMIN can delete other administrative accounts.',
+          },
+        });
+      }
+
+      // 1. Get all active WhatsApp services owned by this user
+      const userServices = await prisma.whatsAppService.findMany({
+        where: { userId: id, deletedAt: null }
+      });
+
+      // 2. Terminate WhatsApp connections and clean up their credential folders
+      for (const service of userServices) {
+        try {
+          await whatsAppServiceManager.deleteInstance(service.id);
+        } catch (err) {
+          fastify.log.error(`Failed to delete WhatsApp instance ${service.id}: ${err}`);
+        }
+      }
+
+      // 3. Perform database cleanups sequentially or in a transaction
+      await prisma.$transaction([
+        // Soft delete WhatsApp services
+        prisma.whatsAppService.updateMany({
+          where: { userId: id, deletedAt: null },
+          data: {
+            status: ServiceStatus.INACTIVE,
+            deletedAt: new Date()
+          }
+        }),
+        // Hard delete user sessions
+        prisma.session.deleteMany({
+          where: { userId: id }
+        }),
+        // Soft delete the user
+        prisma.user.update({
+          where: { id },
+          data: {
+            deletedAt: new Date(),
+            isActive: false
+          }
+        })
+      ]);
+
+      return reply.status(200).send({
+        success: true,
+        data: {
+          message: `User "${targetUser.fullName}" and all associated resources have been successfully deleted.`,
+        }
+      });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to delete user account.',
+        },
+      });
+    }
+  });
 }
+

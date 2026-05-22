@@ -15,12 +15,14 @@ import {
   Smartphone,
   Calendar,
   Lock,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/components/AuthProvider';
 import { apiFetch } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useConfirmation } from '@/components/ConfirmationProvider';
 
 const AdminSkeleton = () => (
   <div className="space-y-8 animate-pulse">
@@ -36,6 +38,7 @@ const AdminSkeleton = () => (
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { confirm } = useConfirmation();
   const [mounted, setMounted] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [users, setUsers] = React.useState<any[]>([]);
@@ -220,6 +223,32 @@ export default function AdminDashboardPage() {
     } else {
       toast.error("Update Failed", res.error?.message || "Failed to change user plan.");
     }
+  };
+
+  // Handle User Deletion
+  const handleDeleteUser = (targetUser: any) => {
+    confirm({
+      title: 'Delete User Account',
+      message: `Are you sure you want to permanently delete user "${targetUser.fullName}"? This action will disconnect all active WhatsApp sessions, wipe related service data, terminate user sessions, and completely revoke their platform access. This action is irreversible.`,
+      confirmText: 'Delete User',
+      type: 'danger',
+      onConfirm: async () => {
+        setUpdatingUserId(targetUser.id);
+        
+        const res = await apiFetch<any>(`/admin/users/${targetUser.id}`, {
+          method: 'DELETE'
+        });
+
+        setUpdatingUserId(null);
+
+        if (res.success) {
+          toast.success("User Deleted", `Successfully deleted user account for "${targetUser.fullName}".`);
+          fetchAdminData();
+        } else {
+          toast.error("Deletion Failed", res.error?.message || "Failed to delete user account.");
+        }
+      }
+    });
   };
 
   // Handle Dynamic Limits Save
@@ -424,17 +453,31 @@ export default function AdminDashboardPage() {
                               {/* Actions */}
                               <td className="py-5 px-4 text-right">
                                 {user?.id !== item.id ? (
-                                  <button
-                                    onClick={() => handleToggleStatus(item)}
-                                    disabled={updatingUserId === item.id}
-                                    className={`px-4 py-2 rounded-xl text-[12px] font-bold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 ${
-                                      item.isActive
-                                        ? 'bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30]'
-                                        : 'bg-[#34C759]/10 hover:bg-[#34C759]/20 text-[#34C759]'
-                                    }`}
-                                  >
-                                    {updatingUserId === item.id ? '...' : item.isActive ? 'Suspend' : 'Activate'}
-                                  </button>
+                                  <div className="flex items-center justify-end gap-2.5">
+                                    <button
+                                      onClick={() => handleToggleStatus(item)}
+                                      disabled={updatingUserId === item.id}
+                                      className={`px-4 py-2 rounded-xl text-[12px] font-bold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 ${
+                                        item.isActive
+                                          ? 'bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30]'
+                                          : 'bg-[#34C759]/10 hover:bg-[#34C759]/20 text-[#34C759]'
+                                      }`}
+                                    >
+                                      {updatingUserId === item.id ? '...' : item.isActive ? 'Suspend' : 'Activate'}
+                                    </button>
+
+                                    {/* Delete User Button - authorized for SUPER_ADMIN or if the target is a standard USER */}
+                                    {((user?.role === 'SUPER_ADMIN') || (item.role === 'USER')) && (
+                                      <button
+                                        onClick={() => handleDeleteUser(item)}
+                                        disabled={updatingUserId === item.id}
+                                        className="p-2 bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] border border-[#ff3b30]/20 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                                        title="Delete User"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
+                                  </div>
                                 ) : (
                                   <span className="text-[12px] text-[#8e8e93] font-bold font-mono px-4">Admin Self</span>
                                 )}

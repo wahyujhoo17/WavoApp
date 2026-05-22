@@ -25,9 +25,12 @@ import {
   ShieldCheck,
   Activity,
   Crown,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 
+import { io, Socket } from 'socket.io-client';
+import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 
 const WhatsAppIcon = ({ size = 20, className = "" }: { size?: number; className?: string }) => (
@@ -89,6 +92,45 @@ const getPlanBadgeStyles = (plan: string) => {
   }
 };
 
+interface NotificationItem {
+  id: string;
+  title: string;
+  desc: string;
+  timestamp: string;
+  type: 'info' | 'success' | 'error' | 'warning';
+  read: boolean;
+  iconName: 'WhatsAppIcon' | 'Webhook' | 'CheckCircle2' | 'AlertCircle' | 'Smartphone';
+}
+
+const formatTimeAgo = (timestampStr: string) => {
+  const diffMs = Date.now() - new Date(timestampStr).getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 10) return 'Just now';
+  if (diffSecs < 60) return `${diffSecs}s ago`;
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
+};
+
+const NotificationIcon = ({ name, size = 20 }: { name: string; size?: number }) => {
+  switch (name) {
+    case 'WhatsAppIcon':
+      return <WhatsAppIcon size={size} />;
+    case 'Webhook':
+      return <Webhook size={size} />;
+    case 'CheckCircle2':
+      return <CheckCircle2 size={size} />;
+    case 'AlertCircle':
+      return <AlertCircle size={size} />;
+    case 'Smartphone':
+    default:
+      return <Smartphone size={size} />;
+  }
+};
 
 const SidebarLink = ({ href, icon: Icon, label, active = false, minimized = false }: { href: string; icon: any; label: string; active?: boolean; minimized?: boolean }) => (
   <Link href={href}>
@@ -130,6 +172,195 @@ export default function DashboardLayout({
   const [isNotificationOpen, setIsNotificationOpen] = React.useState(false);
   const [toast, setToast] = React.useState<{ title: string, message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const { user, logout } = useAuth();
+
+  const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
+  const [services, setServices] = React.useState<any[]>([]);
+  const socketRef = React.useRef<Socket | null>(null);
+  const subscribedRoomsRef = React.useRef<Set<string>>(new Set());
+
+  // Load notifications from localStorage
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('wavo_notifications');
+      if (stored) {
+        try {
+          setNotifications(JSON.parse(stored));
+        } catch (e) {
+          console.error('Failed to parse notifications', e);
+        }
+      }
+    }
+  }, []);
+
+  // Save notifications to localStorage
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('wavo_notifications', JSON.stringify(notifications));
+    }
+  }, [notifications]);
+
+  // Fetch services owned by user to map serviceId to name
+  const fetchServices = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await apiFetch<any[]>('/services');
+      if (response.success && response.data) {
+        setServices(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch services for notifications', error);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    fetchServices();
+    const interval = setInterval(fetchServices, 30000);
+    return () => clearInterval(interval);
+  }, [fetchServices]);
+
+  // Establish global socket connection and subscribe to services
+  React.useEffect(() => {
+    if (!user) return;
+
+    const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+    console.log(`[Notification Socket] Connecting to ${SOCKET_URL}`);
+    const socket = io(SOCKET_URL);
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[Notification Socket] Connected successfully');
+      
+      // Resubscribe to all rooms on reconnect
+      subscribedRoomsRef.current.clear();
+      services.forEach((service) => {
+        console.log(`[Notification Socket] Subscribing to service room service:${service.id}`);
+        socket.emit('subscribe', { serviceId: service.id });
+        subscribedRoomsRef.current.add(service.id);
+      });
+    });
+
+    socket.on('service:status', (data: { serviceId: string; status: string; phoneNumber?: string }) => {
+      console.log('[Notification Socket] Received service status update:', data);
+      
+      // We look up the service name at render/handling time
+      setServices((currentServices) => {
+        const service = currentServices.find((s) => s.id === data.serviceId);
+        const serviceName = service ? service.name : 'WhatsApp Service';
+
+        let title = 'Service Update';
+        let desc = `Service "${serviceName}" status is now ${data.status}`;
+        let type: 'info' | 'success' | 'error' | 'warning' = 'info';
+        let iconName: 'WhatsAppIcon' | 'Webhook' | 'CheckCircle2' | 'AlertCircle' | 'Smartphone' = 'Smartphone';
+
+        switch (data.status) {
+          case 'CONNECTED':
+            title = 'Service Connected';
+            desc = `Service "${serviceName}" is now active and ready${data.phoneNumber ? ` with number +${data.phoneNumber}` : ''}`;
+            type = 'success';
+            iconName = 'CheckCircle2';
+            break;
+          case 'DISCONNECTED':
+            title = 'Service Disconnected';
+            desc = `Service "${serviceName}" has disconnected`;
+            type = 'error';
+            iconName = 'AlertCircle';
+            break;
+          case 'CONNECTING':
+            title = 'Service Connecting';
+            desc = `Service "${serviceName}" is establishing connection...`;
+            type = 'info';
+            iconName = 'Smartphone';
+            break;
+          case 'QR_PENDING':
+            title = 'Scan QR Code';
+            desc = `Service "${serviceName}" generated a new QR Code. Scan to connect.`;
+            type = 'info';
+            iconName = 'Smartphone';
+            break;
+          case 'SUSPENDED':
+            title = 'Service Suspended';
+            desc = `Service "${serviceName}" has been suspended`;
+            type = 'error';
+            iconName = 'AlertCircle';
+            break;
+        }
+
+        const newNotif: NotificationItem = {
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+          title,
+          desc,
+          timestamp: new Date().toISOString(),
+          type,
+          read: false,
+          iconName,
+        };
+
+        setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
+        setToast({
+          title: newNotif.title,
+          message: newNotif.desc,
+          type: newNotif.type === 'warning' ? 'info' : newNotif.type,
+        });
+
+        return currentServices;
+      });
+    });
+
+    socket.on('service:message', (data: { serviceId: string; from: string; message: string; type: string; timestamp: string }) => {
+      console.log('[Notification Socket] Received service message update:', data);
+
+      setServices((currentServices) => {
+        const service = currentServices.find((s) => s.id === data.serviceId);
+        const serviceName = service ? service.name : 'WhatsApp Service';
+
+        const newNotif: NotificationItem = {
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+          title: 'New Message Received',
+          desc: `New message from +${data.from} on service "${serviceName}": ${data.message.slice(0, 60)}${data.message.length > 60 ? '...' : ''}`,
+          timestamp: new Date().toISOString(),
+          type: 'info',
+          read: false,
+          iconName: 'WhatsAppIcon',
+        };
+
+        setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
+        setToast({
+          title: newNotif.title,
+          message: newNotif.desc,
+          type: 'info',
+        });
+
+        return currentServices;
+      });
+    });
+
+    return () => {
+      console.log('[Notification Socket] Cleaning up socket connection');
+      socket.disconnect();
+      socketRef.current = null;
+      subscribedRoomsRef.current.clear();
+    };
+  }, [user]);
+
+  // Subscribe to new services rooms when services list changes
+  React.useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    services.forEach((service) => {
+      if (!subscribedRoomsRef.current.has(service.id)) {
+        console.log(`[Notification Socket] Subscribing to new service room service:${service.id}`);
+        socket.emit('subscribe', { serviceId: service.id });
+        subscribedRoomsRef.current.add(service.id);
+      }
+    });
+  }, [services]);
+
+  const markAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const hasUnread = notifications.some((n) => !n.read);
 
   // Global toast listener
   React.useEffect(() => {
@@ -301,7 +532,9 @@ export default function DashboardLayout({
                   className={`p-2 transition-colors relative rounded-lg ${isNotificationOpen ? 'bg-white/10 text-white' : 'text-[#8e8e93] hover:text-white'}`}
                 >
                   <Bell size={20} />
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-[#0a0a0c]" />
+                  {hasUnread && (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-[#0a0a0c]" />
+                  )}
                 </button>
 
                 <AnimatePresence>
@@ -319,34 +552,57 @@ export default function DashboardLayout({
                       >
                         <div className="p-5 border-b border-white/5 flex items-center justify-between">
                           <h3 className="text-[16px] font-bold text-white">Notifications</h3>
-                          <button className="text-[12px] font-bold text-primary hover:opacity-80 transition-opacity">Mark all as read</button>
+                          <button 
+                            onClick={markAllAsRead}
+                            className="text-[12px] font-bold text-primary hover:opacity-80 transition-opacity"
+                          >
+                            Mark all as read
+                          </button>
                         </div>
-                        <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-                          {[
-                            { title: 'New Message Received', desc: 'Marketing Bot received a message from +123456789', time: '2 mins ago', type: 'info', icon: WhatsAppIcon },
-                            { title: 'Webhook Delivery Failed', desc: 'Endpoint https://api.example.com/webhook returned 500', time: '15 mins ago', type: 'error', icon: Webhook },
-                            { title: 'Service Connected', desc: 'Support Channel is now active and ready', time: '1 hour ago', type: 'success', icon: CheckCircle2 }
-                          ].map((item, i) => (
-                            <div key={i} className="p-4 border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors cursor-pointer group">
-                              <div className="flex gap-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                                  item.type === 'error' ? 'bg-[#FF3B30]/10 text-[#FF3B30]' : 
-                                  item.type === 'success' ? 'bg-[#34C759]/10 text-[#34C759]' : 
-                                  'bg-primary/10 text-primary'
-                                }`}>
-                                  <item.icon size={20} />
-                                </div>
-                                <div className="space-y-1">
-                                  <h4 className="text-[14px] font-bold text-white group-hover:text-primary transition-colors">{item.title}</h4>
-                                  <p className="text-[12px] text-[#8e8e93] leading-relaxed line-clamp-2">{item.desc}</p>
-                                  <p className="text-[11px] text-[#8e8e93]/50 font-medium pt-1">{item.time}</p>
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center flex flex-col items-center justify-center space-y-3">
+                            <div className="w-12 h-12 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center text-[#8e8e93]">
+                              <Bell size={24} className="opacity-40" />
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[14px] font-bold text-white">No new notifications</p>
+                              <p className="text-[12px] text-[#8e8e93]/70 max-w-[240px] leading-relaxed">
+                                Connect your WhatsApp services to receive live message and status updates.
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                            {notifications.map((item) => (
+                              <div key={item.id} className="p-4 border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors cursor-pointer group">
+                                <div className="flex gap-4">
+                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                                    item.type === 'error' ? 'bg-[#FF3B30]/10 text-[#FF3B30]' : 
+                                    item.type === 'success' ? 'bg-[#34C759]/10 text-[#34C759]' : 
+                                    'bg-primary/10 text-primary'
+                                  }`}>
+                                    <NotificationIcon name={item.iconName} size={20} />
+                                  </div>
+                                  <div className="space-y-1 flex-1 min-w-0">
+                                    <h4 className="text-[14px] font-bold text-white group-hover:text-primary transition-colors flex items-center gap-2">
+                                      {item.title}
+                                      {!item.read && (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                      )}
+                                    </h4>
+                                    <p className="text-[12px] text-[#8e8e93] leading-relaxed line-clamp-2">{item.desc}</p>
+                                    <p className="text-[11px] text-[#8e8e93]/50 font-medium pt-1">{formatTimeAgo(item.timestamp)}</p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                        <button className="w-full p-4 text-[13px] font-bold text-[#8e8e93] hover:text-white hover:bg-white/5 transition-all text-center">
-                          View all notifications
+                            ))}
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => setNotifications([])}
+                          className="w-full p-4 text-[13px] font-bold text-[#8e8e93] hover:text-white hover:bg-white/5 transition-all text-center"
+                        >
+                          Clear all notifications
                         </button>
                       </motion.div>
                     </>

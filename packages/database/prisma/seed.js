@@ -11,25 +11,27 @@ async function main() {
   const adminPassword = 'wavo_admin_2026';
   const hashedPassword = bcrypt.hashSync(adminPassword, 12);
 
-  const adminUser = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {
-      passwordHash: hashedPassword,
-      role: UserRole.SUPER_ADMIN,
-      plan: UserPlan.ENTERPRISE,
-      isActive: true,
-    },
-    create: {
-      email: adminEmail,
-      passwordHash: hashedPassword,
-      fullName: 'Wavo Super Admin',
-      role: UserRole.SUPER_ADMIN,
-      plan: UserPlan.ENTERPRISE,
-      isActive: true,
-    },
+  // Check if any SUPER_ADMIN already exists (e.g. if the admin has updated their email)
+  const existingSuperAdmin = await prisma.user.findFirst({
+    where: { role: UserRole.SUPER_ADMIN }
   });
 
-  console.log(`✅ Super Admin created/updated: ${adminUser.email} (${adminUser.role})`);
+  let adminUser;
+  if (existingSuperAdmin) {
+    adminUser = existingSuperAdmin;
+    console.log(`ℹ️ Super Admin already exists in the system: ${adminUser.email} (Skipped default seeding to prevent duplicates)`);
+  } else {
+    adminUser = await prisma.user.create({
+      data: {
+        email: adminEmail,
+        passwordHash: hashedPassword,
+        fullName: 'Wavo Super Admin',
+        role: UserRole.SUPER_ADMIN,
+        plan: UserPlan.ENTERPRISE,
+        isActive: true,
+      },
+    });
+  }
 
   // 2. Seed default dynamic system configurations
   const configs = [
