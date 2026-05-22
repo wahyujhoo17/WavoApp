@@ -45,7 +45,11 @@ services:
       - redis
       - minio
 
-  engine:
+  wavo-frontend:
+    container_name: wavo-frontend
+    labels:
+      - "project=wavo"
+      - "component=frontend"
     build:
       context: ./apps/engine
       dockerfile: Dockerfile
