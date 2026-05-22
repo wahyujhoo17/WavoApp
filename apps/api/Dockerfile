@@ -4,17 +4,14 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Copy package files for the api subfolder and install deps (including dev deps for build)
-# Copy package files and install deps; use `npm install` to support missing lockfile
-COPY apps/api/package*.json ./
-COPY apps/api/tsconfig*.json ./
+# When the build context is `./apps/api` (as in compose), copy files relative to that context.
+# Copy package files and tsconfig, install dev deps required for build
+COPY package*.json ./
+COPY tsconfig*.json ./
 RUN npm install --silent
 
-# Copy only the api source to keep context small
-COPY apps/api ./apps/api
-WORKDIR /app/apps/api
-
-# Build the TypeScript project
+# Copy the rest of the app source and build
+COPY . ./
 RUN npm run build
 
 ## Runtime image
@@ -22,8 +19,8 @@ FROM node:18-alpine AS runner
 WORKDIR /app
 
 # Copy built artifacts and package files from builder
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/package*.json ./
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package*.json ./
 
 ENV NODE_ENV=production
 
