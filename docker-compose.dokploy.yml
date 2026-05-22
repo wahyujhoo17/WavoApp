@@ -26,8 +26,8 @@ services:
 
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/api.Dockerfile
     environment:
       # Replace these values with Dokploy Secrets in the UI before deploy
       DATABASE_URL: postgres://postgres:postgres_password@postgres:5432/wavo?schema=public
