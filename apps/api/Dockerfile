@@ -1,8 +1,11 @@
 ## Multi-stage Dockerfile for apps/api
 # Builds TypeScript sources and produces a small runtime image
 
-FROM node:18-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
+
+# Install build tools needed for some native npm modules (node-gyp)
+RUN apt-get update && apt-get install -y python3 build-essential make g++ ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # When the build context is `./apps/api` (as in compose), copy files relative to that context.
 # Copy package files and tsconfig, install dev deps required for build
@@ -32,7 +35,7 @@ COPY . ./
 RUN npm run build
 
 ## Runtime image
-FROM node:18-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 
 # Copy built artifacts and package files from builder
