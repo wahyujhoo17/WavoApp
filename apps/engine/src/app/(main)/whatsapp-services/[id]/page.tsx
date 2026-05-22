@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { 
@@ -83,6 +84,12 @@ const LogRow = ({ time, direction, type, toNumber, fromNumber, status }: any) =>
 export default function ServiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const { confirm, prompt } = useConfirmation();
+
+  // Client hydration check
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Detail states
   const [loading, setLoading] = React.useState(true);
@@ -499,77 +506,80 @@ export default function ServiceDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* API Key Modal Overlay (shown only once after creation) */}
-      <AnimatePresence>
-        {showNewApiKey && newApiKey && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-6"
-          >
+      {mounted && typeof document !== 'undefined' ? createPortal(
+        <AnimatePresence>
+          {showNewApiKey && newApiKey && (
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[480px] bg-[#1c1c1e] border border-white/10 rounded-[32px] p-8 shadow-2xl relative overflow-hidden space-y-6 animate-none"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-6"
             >
-              {/* Background glow */}
-              <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#34C759]/5 rounded-full blur-3xl" />
-              
-              {/* Header */}
-              <div className="flex items-center gap-4 relative">
-                <div className="p-3 bg-[#34C759]/10 border border-[#34C759]/20 rounded-2xl text-[#34C759]">
-                  <CheckCircle2 size={24} />
-                </div>
-                <div>
-                  <h3 className="text-[20px] font-bold text-white tracking-tight">API Key Created</h3>
-                  <p className="text-[13px] text-[#8e8e93] font-medium mt-1">Copy this key now — you won't be able to see it again.</p>
-                </div>
-              </div>
-
-              {/* Key Display */}
-              <div className="relative space-y-3">
-                <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-[0.2em] block px-1">Your Secret API Key</label>
-                <div className="flex gap-3">
-                  <input 
-                    readOnly 
-                    value={newApiKey}
-                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-[14px] font-mono text-white outline-none select-all transition-all focus:border-[#34C759]/30"
-                    onClick={(e) => (e.target as HTMLInputElement).select()}
-                  />
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(newApiKey);
-                      toast.success("Copied!", "Full API Key copied to clipboard.");
-                    }}
-                    className="px-5 py-3.5 bg-[#34C759] hover:bg-[#34C759]/90 rounded-xl text-black font-bold text-[14px] transition-all flex items-center gap-2 shrink-0 cursor-pointer"
-                  >
-                    <Copy size={18} />
-                    Copy
-                  </button>
-                </div>
-              </div>
-
-              {/* Warning */}
-              <div className="flex items-start gap-3 p-4 bg-[#FFCC00]/10 border border-[#FFCC00]/20 rounded-2xl">
-                <AlertTriangle size={20} className="text-[#FFCC00] shrink-0 mt-0.5" />
-                <p className="text-[13px] text-[#FFCC00]/90 leading-relaxed">
-                  <strong>This is the only time the full key will be shown.</strong> Store it in a secure location like a password manager or environment variable.
-                </p>
-              </div>
-
-              {/* Dismiss */}
-              <button 
-                onClick={() => setShowNewApiKey(false)}
-                className="w-full py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[14px] font-bold text-white transition-all cursor-pointer"
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-[480px] bg-[#1c1c1e] border border-white/10 rounded-[32px] p-8 shadow-2xl relative overflow-hidden space-y-6 animate-none"
               >
-                I've Saved My Key — Close
-              </button>
+                {/* Background glow */}
+                <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#34C759]/5 rounded-full blur-3xl" />
+                
+                {/* Header */}
+                <div className="flex items-center gap-4 relative">
+                  <div className="p-3 bg-[#34C759]/10 border border-[#34C759]/20 rounded-2xl text-[#34C759]">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-[20px] font-bold text-white tracking-tight">API Key Created</h3>
+                    <p className="text-[13px] text-[#8e8e93] font-medium mt-1">Copy this key now — you won't be able to see it again.</p>
+                  </div>
+                </div>
+
+                {/* Key Display */}
+                <div className="relative space-y-3">
+                  <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-[0.2em] block px-1">Your Secret API Key</label>
+                  <div className="flex gap-3">
+                    <input 
+                      readOnly 
+                      value={newApiKey}
+                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-[14px] font-mono text-white outline-none select-all transition-all focus:border-[#34C759]/30"
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(newApiKey);
+                        toast.success("Copied!", "Full API Key copied to clipboard.");
+                      }}
+                      className="px-5 py-3.5 bg-[#34C759] hover:bg-[#34C759]/90 rounded-xl text-black font-bold text-[14px] transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+                    >
+                      <Copy size={18} />
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
+                {/* Warning */}
+                <div className="flex items-start gap-3 p-4 bg-[#FFCC00]/10 border border-[#FFCC00]/20 rounded-2xl">
+                  <AlertTriangle size={20} className="text-[#FFCC00] shrink-0 mt-0.5" />
+                  <p className="text-[13px] text-[#FFCC00]/90 leading-relaxed">
+                    <strong>This is the only time the full key will be shown.</strong> Store it in a secure location like a password manager or environment variable.
+                  </p>
+                </div>
+
+                {/* Dismiss */}
+                <button 
+                  onClick={() => setShowNewApiKey(false)}
+                  className="w-full py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[14px] font-bold text-white transition-all cursor-pointer"
+                >
+                  I've Saved My Key — Close
+                </button>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Scan to Connect */}
