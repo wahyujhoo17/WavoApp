@@ -1,6 +1,6 @@
 ## Multi-stage Dockerfile to run both `apps/api` and `apps/engine` in one container
 ## Builder stage: install deps and build both projects
-FROM node:18 AS builder
+FROM node:20 AS builder
 WORKDIR /build
 
 # Install and build API
@@ -18,7 +18,7 @@ COPY apps/engine ./engine
 RUN cd ./engine && npm run build
 
 ## Runtime image
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Copy built API
