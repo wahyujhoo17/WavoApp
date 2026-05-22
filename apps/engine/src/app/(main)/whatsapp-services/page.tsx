@@ -73,7 +73,7 @@ const ServiceCard = ({
       return;
     }
     
-    const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+    const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000';
     console.log(`[Socket] Connecting to ${SOCKET_URL} for room service:${id}`);
     
     const socket = io(SOCKET_URL);

@@ -92,7 +92,7 @@ export async function queueMessage(
     }
   });
 
-  return { jobId: dbJob.id, messageId: messageLog.id };
+  return { jobId: dbJob.id, messageId: messageLog.id.toString() };
 }
 
 /**
