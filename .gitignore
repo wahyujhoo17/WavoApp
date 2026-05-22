@@ -64,6 +64,5 @@ Desktop.ini
 .env.local
 
 # Keep nested git repositories completely isolated
-/apps/engine/
-/apps/landing/
+# (Note: do not ignore `apps/engine` or `apps/landing` if they are part of this repo)
 
