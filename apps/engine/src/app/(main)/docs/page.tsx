@@ -175,7 +175,7 @@ const PlanLimitsTable = () => (
 );
 
 
-const API_BASE_URL = 'http://localhost:4000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 const SECTIONS = [
   { id: 'getting-started', label: 'Getting Started', icon: Zap },
@@ -198,7 +198,7 @@ export default function DocumentationPage() {
   };
 
   /* ─── Code Snippets ─── */
-  const curlLogin = `curl -X POST ${API_BASE_URL}/api/v1/auth/login \\
+  const curlLogin = `curl -X POST ${API_BASE_URL}/auth/login \\
   -H "Content-Type: application/json" \\
   -d '{
     "email": "you@example.com",
@@ -220,7 +220,7 @@ export default function DocumentationPage() {
   }
 }`;
 
-  const curlSendText = `curl -X POST ${API_BASE_URL}/api/v1/send/text \\
+  const curlSendText = `curl -X POST ${API_BASE_URL}/send/text \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <ACCESS_TOKEN or API_KEY>" \\
   -d '{
@@ -242,7 +242,7 @@ export default function DocumentationPage() {
   }
 }`;
 
-  const curlSendBulk = `curl -X POST ${API_BASE_URL}/api/v1/send/bulk \\
+  const curlSendBulk = `curl -X POST ${API_BASE_URL}/send/bulk \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <ACCESS_TOKEN>" \\
   -d '{
@@ -255,14 +255,14 @@ export default function DocumentationPage() {
     }
   }'`;
 
-  const curlSendImage = `curl -X POST ${API_BASE_URL}/api/v1/send/image \\
+  const curlSendImage = `curl -X POST ${API_BASE_URL}/send/image \\
   -H "Authorization: Bearer <ACCESS_TOKEN>" \\
   -F "serviceId=your-service-uuid" \\
   -F "to=6281234567890" \\
   -F "caption=Look at this photo!" \\
   -F "file=@/path/to/image.jpg"`;
 
-  const curlCreateService = `curl -X POST ${API_BASE_URL}/api/v1/services \\
+  const curlCreateService = `curl -X POST ${API_BASE_URL}/services \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <ACCESS_TOKEN>" \\
   -d '{
@@ -305,7 +305,7 @@ app.post('/webhook', express.json(), (req, res) => {
   }
 });`;
 
-  const curlCreateApiKey = `curl -X POST ${API_BASE_URL}/api/v1/api-keys \\
+  const curlCreateApiKey = `curl -X POST ${API_BASE_URL}/api-keys \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <ACCESS_TOKEN>" \\
   -d '{
@@ -390,7 +390,7 @@ app.post('/webhook', express.json(), (req, res) => {
           <div className="flex flex-wrap gap-3 pt-2">
             <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[12px] font-bold text-[#8e8e93]">
               <Globe size={14} />
-              Base URL: <code className="text-[#cfbcff] ml-1">{API_BASE_URL}/api/v1</code>
+              Base URL: <code className="text-[#cfbcff] ml-1">{API_BASE_URL}</code>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[12px] font-bold text-[#8e8e93]">
               <Lock size={14} />
@@ -411,7 +411,7 @@ app.post('/webhook', express.json(), (req, res) => {
               <div className="w-8 h-8 rounded-full bg-[#cfbcff]/10 flex items-center justify-center text-[#cfbcff] font-bold text-[13px] shrink-0">1</div>
               <div>
                 <h4 className="text-[14px] font-bold text-white">Register an Account</h4>
-                <p className="text-[13px] text-[#8e8e93] mt-1">Create a user account via <code className="bg-white/5 px-1.5 py-0.5 rounded text-[#cfbcff] text-[12px]">POST /api/v1/auth/register</code> or the Dashboard at <code className="bg-white/5 px-1.5 py-0.5 rounded text-[#cfbcff] text-[12px]">http://localhost:3001/register</code>.</p>
+                <p className="text-[13px] text-[#8e8e93] mt-1">Create a user account via <code className="bg-white/5 px-1.5 py-0.5 rounded text-[#cfbcff] text-[12px]">POST /api/v1/auth/register</code> or the Dashboard Register page.</p>
               </div>
             </div>
             <div className="flex gap-4 p-5 rounded-2xl bg-black/20 border border-white/[0.04]">
@@ -803,7 +803,7 @@ app.post('/webhook', express.json(), (req, res) => {
             <span>•</span>
             <span>Backend: <code className="text-[#cfbcff]">{API_BASE_URL}</code></span>
             <span>•</span>
-            <span>Dashboard: <code className="text-[#cfbcff]">http://localhost:3001</code></span>
+            <span>Dashboard: <code className="text-[#cfbcff]">This site</code></span>
           </div>
         </div>
       </div>
