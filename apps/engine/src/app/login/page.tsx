@@ -8,6 +8,7 @@ import { Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 import { useAuth } from '@/components/AuthProvider';
 import { toast } from '@/lib/toast';
+import { cn } from '@/lib/utils';
 
 const Github = ({ size = 18, ...props }: { size?: number; [key: string]: any }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -25,6 +26,9 @@ export default function LoginPage() {
   const [showPass, setShowPass] = React.useState(false);
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState<string | null>(null);
+  const [emailError, setEmailError] = React.useState<string | null>(null);
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
   const { login, isLoading } = useAuth();
 
   React.useEffect(() => {
@@ -42,10 +46,36 @@ export default function LoginPage() {
     }
   }, []);
 
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (emailError) setEmailError(null);
+    if (error) setError(null);
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    if (passwordError) setPasswordError(null);
+    if (error) setError(null);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
-    await login(email, password);
+    
+    setError(null);
+    setEmailError(null);
+    setPasswordError(null);
+
+    const result = await login(email, password);
+    if (!result.success) {
+      if (result.code === 'EMAIL_NOT_FOUND') {
+        setEmailError(result.error || "Email address is not registered.");
+      } else if (result.code === 'INVALID_PASSWORD') {
+        setPasswordError(result.error || "The password you entered is incorrect.");
+      } else {
+        setError(result.error || "Invalid email address or password. Please try again.");
+      }
+    }
   };
 
   return (
@@ -100,10 +130,18 @@ export default function LoginPage() {
                   type="email" 
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={handleEmailChange}
                   placeholder="dev@example.com"
-                  className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none focus:border-primary/40 transition-all"
+                  className={cn(
+                    "w-full bg-black/40 border rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none transition-all",
+                    emailError 
+                      ? "border-red-500/30 focus:border-red-500/60" 
+                      : "border-white/5 focus:border-primary/40"
+                  )}
                 />
+                {emailError && (
+                  <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{emailError}</span>
+                )}
               </div>
 
               <div className="space-y-2 relative">
@@ -111,27 +149,44 @@ export default function LoginPage() {
                   <label className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Password</label>
                   <Link href="#" className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest hover:text-primary transition-colors">Forgot Password?</Link>
                 </div>
-                <input 
-                  type={showPass ? "text" : "password"} 
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 pr-12 text-white text-sm focus:outline-none focus:border-primary/40 transition-all"
-                />
-                <button 
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  className="absolute right-4 bottom-3.5 text-on-surface-variant/30 hover:text-white transition-colors"
-                >
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+                <div className="relative">
+                  <input 
+                    type={showPass ? "text" : "password"} 
+                    required
+                    value={password}
+                    onChange={handlePasswordChange}
+                    placeholder="••••••••"
+                    className={cn(
+                      "w-full bg-black/40 border rounded-xl px-4 py-3.5 pr-12 text-white text-sm focus:outline-none transition-all",
+                      passwordError 
+                        ? "border-red-500/30 focus:border-red-500/60" 
+                        : "border-white/5 focus:border-primary/40"
+                    )}
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 hover:text-white transition-colors"
+                  >
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {passwordError && (
+                  <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{passwordError}</span>
+                )}
               </div>
 
               <div className="flex items-center gap-3 px-1 py-1">
                 <input type="checkbox" className="w-4 h-4 rounded border-white/10 bg-white/5 accent-primary cursor-pointer" />
                 <span className="text-xs font-medium text-on-surface-variant/60">Remember this device for 30 days</span>
               </div>
+
+              {error && (
+                <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs font-bold flex items-center gap-2.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
+                  <span>{error}</span>
+                </div>
+              )}
 
               <button 
                 type="submit"

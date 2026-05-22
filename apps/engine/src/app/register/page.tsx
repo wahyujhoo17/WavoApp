@@ -7,6 +7,7 @@ import { Code2, ShieldCheck, ChevronDown, Check, Eye, EyeOff, ArrowRight } from 
 
 import { useAuth } from '@/components/AuthProvider';
 import { toast } from '@/lib/toast';
+import { cn } from '@/lib/utils';
 
 const Github = ({ size = 18, ...props }: { size?: number; [key: string]: any }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -41,16 +42,76 @@ export default function RegisterPage() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
+  
+  const [fullNameError, setFullNameError] = React.useState<string | null>(null);
+  const [emailError, setEmailError] = React.useState<string | null>(null);
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
   const { register, isLoading } = useAuth();
+
+  const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFullName(e.target.value);
+    if (fullNameError) setFullNameError(null);
+    if (error) setError(null);
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (emailError) setEmailError(null);
+    if (error) setError(null);
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    if (passwordError) setPasswordError(null);
+    if (error) setError(null);
+  };
+
+  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setConfirmPassword(e.target.value);
+    if (confirmPasswordError) setConfirmPasswordError(null);
+    if (error) setError(null);
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !email || !password || !confirmPassword) return;
-    if (password !== confirmPassword) {
-      toast.error("Password Mismatch", "Passwords do not match. Please verify.");
-      return;
+
+    setFullNameError(null);
+    setEmailError(null);
+    setPasswordError(null);
+    setConfirmPasswordError(null);
+    setError(null);
+
+    let hasLocalError = false;
+
+    if (fullName.length < 2) {
+      setFullNameError("Full name must be at least 2 characters.");
+      hasLocalError = true;
     }
-    await register(email, password, fullName);
+
+    if (password.length < 8) {
+      setPasswordError("Password must be at least 8 characters.");
+      hasLocalError = true;
+    }
+
+    if (password !== confirmPassword) {
+      setConfirmPasswordError("Passwords do not match. Please verify.");
+      hasLocalError = true;
+    }
+
+    if (hasLocalError) return;
+
+    const result = await register(email, password, fullName);
+    if (!result.success) {
+      if (result.code === 'CONFLICT') {
+        setEmailError(result.error || "A user with this email address already exists.");
+      } else {
+        setError(result.error || "An error occurred during registration. Please try again.");
+      }
+    }
   };
 
   return (
@@ -135,10 +196,18 @@ export default function RegisterPage() {
                   type="text" 
                   required
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={handleFullNameChange}
                   placeholder="Ada Lovelace"
-                  className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none focus:border-primary/40 transition-all font-medium"
+                  className={cn(
+                    "w-full bg-black/40 border rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none transition-all font-medium",
+                    fullNameError 
+                      ? "border-red-500/30 focus:border-red-500/60" 
+                      : "border-white/5 focus:border-primary/40"
+                  )}
                 />
+                {fullNameError && (
+                  <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{fullNameError}</span>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -147,10 +216,18 @@ export default function RegisterPage() {
                   type="email" 
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={handleEmailChange}
                   placeholder="ada@devos.io"
-                  className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none focus:border-primary/40 transition-all font-medium"
+                  className={cn(
+                    "w-full bg-black/40 border rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none transition-all font-medium",
+                    emailError 
+                      ? "border-red-500/30 focus:border-red-500/60" 
+                      : "border-white/5 focus:border-primary/40"
+                  )}
                 />
+                {emailError && (
+                  <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{emailError}</span>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -160,9 +237,14 @@ export default function RegisterPage() {
                     type={showPass ? "text" : "password"} 
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={handlePasswordChange}
                     placeholder="••••••••"
-                    className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 pr-12 text-white text-sm focus:outline-none focus:border-primary/40 transition-all font-medium"
+                    className={cn(
+                      "w-full bg-black/40 border rounded-xl px-4 py-3.5 pr-12 text-white text-sm focus:outline-none transition-all font-medium",
+                      passwordError 
+                        ? "border-red-500/30 focus:border-red-500/60" 
+                        : "border-white/5 focus:border-primary/40"
+                    )}
                   />
                   <button 
                     type="button"
@@ -172,6 +254,9 @@ export default function RegisterPage() {
                     {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {passwordError && (
+                  <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{passwordError}</span>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -181,9 +266,14 @@ export default function RegisterPage() {
                     type={showConfirmPass ? "text" : "password"} 
                     required
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={handleConfirmPasswordChange}
                     placeholder="••••••••"
-                    className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 pr-12 text-white text-sm focus:outline-none focus:border-primary/40 transition-all font-medium"
+                    className={cn(
+                      "w-full bg-black/40 border rounded-xl px-4 py-3.5 pr-12 text-white text-sm focus:outline-none transition-all font-medium",
+                      confirmPasswordError 
+                        ? "border-red-500/30 focus:border-red-500/60" 
+                        : "border-white/5 focus:border-primary/40"
+                    )}
                   />
                   <button 
                     type="button"
@@ -193,6 +283,9 @@ export default function RegisterPage() {
                     {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {confirmPasswordError && (
+                  <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{confirmPasswordError}</span>
+                )}
               </div>
 
               <div className="flex items-start gap-3 px-1 py-1 pt-2">
@@ -201,6 +294,13 @@ export default function RegisterPage() {
                   I agree to the <Link href="#" className="text-white hover:text-primary transition-colors">Terms of Service</Link> and <Link href="#" className="text-white hover:text-primary transition-colors">Privacy Policy</Link>. I also consent to receiving developer updates.
                 </p>
               </div>
+
+              {error && (
+                <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs font-bold flex items-center gap-2.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
+                  <span>{error}</span>
+                </div>
+              )}
 
               <button 
                 type="submit"

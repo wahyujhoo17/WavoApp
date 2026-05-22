@@ -32,6 +32,7 @@ import {
 import { io, Socket } from 'socket.io-client';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
+import { toast } from '@/lib/toast';
 
 const WhatsAppIcon = ({ size = 20, className = "" }: { size?: number; className?: string }) => (
   <svg 
@@ -170,7 +171,6 @@ export default function DashboardLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isMinimized, setIsMinimized] = React.useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = React.useState(false);
-  const [toast, setToast] = React.useState<{ title: string, message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const { user, logout } = useAuth();
 
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
@@ -296,11 +296,11 @@ export default function DashboardLayout({
         };
 
         setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
-        setToast({
-          title: newNotif.title,
-          message: newNotif.desc,
-          type: newNotif.type === 'warning' ? 'info' : newNotif.type,
-        });
+        toast.show(
+          newNotif.title,
+          newNotif.desc,
+          newNotif.type === 'warning' ? 'info' : (newNotif.type as any)
+        );
 
         return currentServices;
       });
@@ -324,11 +324,7 @@ export default function DashboardLayout({
         };
 
         setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
-        setToast({
-          title: newNotif.title,
-          message: newNotif.desc,
-          type: 'info',
-        });
+        toast.info(newNotif.title, newNotif.desc);
 
         return currentServices;
       });
@@ -361,17 +357,6 @@ export default function DashboardLayout({
   };
 
   const hasUnread = notifications.some((n) => !n.read);
-
-  // Global toast listener
-  React.useEffect(() => {
-    const handleToast = (event: any) => {
-      setToast(event.detail);
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    };
-    window.addEventListener('show-toast', handleToast);
-    return () => window.removeEventListener('show-toast', handleToast);
-  }, []);
 
   return (
     <div className="flex h-screen bg-[#0a0a0c] text-white overflow-hidden font-sans">
@@ -671,35 +656,6 @@ export default function DashboardLayout({
             onClick={() => setIsMobileMenuOpen(false)}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           />
-        )}
-      </AnimatePresence>
-      {/* Global Toast Notification */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className="fixed bottom-8 right-8 z-[1000] flex items-center gap-3 bg-[#1c1c1e] border border-white/10 px-6 py-4 rounded-2xl shadow-2xl min-w-[300px]"
-          >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-              toast.type === 'success' ? 'bg-[#34C759]/10 text-[#34C759]' : 
-              toast.type === 'error' ? 'bg-[#FF3B30]/10 text-[#FF3B30]' : 
-              'bg-[#cfbcff]/10 text-[#cfbcff]'
-            }`}>
-              {toast.type === 'success' ? <ShieldCheck size={20} /> : <Activity size={20} />}
-            </div>
-            <div className="flex-1">
-              <p className="text-[14px] font-bold text-white">{toast.title}</p>
-              <p className="text-[12px] text-[#8e8e93] font-medium">{toast.message}</p>
-            </div>
-            <button 
-              onClick={() => setToast(null)}
-              className="text-[#8e8e93] hover:text-white transition-colors"
-            >
-              <LogOut size={16} className="rotate-90" />
-            </button>
-          </motion.div>
         )}
       </AnimatePresence>
     </div>

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/AuthProvider";
 import { ConfirmationProvider } from "@/components/ConfirmationProvider";
+import { ToastProvider } from "@/components/ToastProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -43,9 +44,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <ConfirmationProvider>
-              {children}
-            </ConfirmationProvider>
+            <ToastProvider>
+              <ConfirmationProvider>
+                {children}
+              </ConfirmationProvider>
+            </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

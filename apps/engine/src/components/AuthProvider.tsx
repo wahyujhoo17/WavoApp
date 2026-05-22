@@ -16,8 +16,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, fullName: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string }>;
+  register: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string; code?: string }>;
   logout: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
@@ -67,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user, isLoading, pathname, router]);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; code?: string }> => {
     setIsLoading(true);
     const res = await apiFetch<{ user: User; accessToken: string; refreshToken: string }>('/auth/login', {
       method: 'POST',
@@ -83,14 +83,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(loggedInUser);
       toast.success("Login Successful", `Welcome back, ${loggedInUser.fullName}!`);
       router.push('/dashboard');
-      return true;
+      return { success: true };
     } else {
-      toast.error("Authentication Failed", res.error?.message || "Invalid email or password.");
-      return false;
+      const errMsg = res.error?.message || "Invalid email or password.";
+      toast.error("Authentication Failed", errMsg);
+      return { success: false, error: errMsg, code: res.error?.code };
     }
   };
 
-  const register = async (email: string, password: string, fullName: string): Promise<boolean> => {
+  const register = async (email: string, password: string, fullName: string): Promise<{ success: boolean; error?: string; code?: string }> => {
     setIsLoading(true);
     const res = await apiFetch<{ user: User; accessToken: string; refreshToken: string }>('/auth/register', {
       method: 'POST',
@@ -102,10 +103,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (res.success && res.data) {
       toast.success("Account Created", "Developer account successfully registered! Please sign in.");
       router.push('/login');
-      return true;
+      return { success: true };
     } else {
-      toast.error("Registration Failed", res.error?.message || "An error occurred during sign up.");
-      return false;
+      const errMsg = res.error?.message || "An error occurred during sign up.";
+      toast.error("Registration Failed", errMsg);
+      return { success: false, error: errMsg, code: res.error?.code };
     }
   };
 
