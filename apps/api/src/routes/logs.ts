@@ -52,7 +52,7 @@ export const logsRoutes: FastPluginAsync = async (fastify: FastifyInstance) => {
 
     // Standard cursor extraction
     let skip = 0;
-    let cursorObj = undefined;
+    let cursorObj: any = undefined;
 
     if (cursor) {
       skip = 1;

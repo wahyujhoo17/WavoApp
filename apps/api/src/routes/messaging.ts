@@ -186,7 +186,7 @@ export const messagingRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
     console.log(`[Bulk API] Received bulk request for ${recipients.length} recipients.`);
 
     // Batch send sequentially by queueing single messages into the worker
-    const messageDetails = [];
+    const messageDetails: any[] = [];
     for (const recipient of recipients) {
       const { jobId, messageId } = await queueMessage(serviceId, recipient, message, plan, {
         typingDelay: options.typingDelay,
