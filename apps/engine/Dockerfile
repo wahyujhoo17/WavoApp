@@ -6,7 +6,11 @@ RUN npm ci --production --silent || npm install --production --silent
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN npm install --silent
+RUN if [ -f package-lock.json ]; then \
+			npm ci --silent; \
+		else \
+			npm install --silent --no-audit --no-fund --legacy-peer-deps; \
+		fi
 RUN npm run build
 
 FROM node:20-alpine AS runner

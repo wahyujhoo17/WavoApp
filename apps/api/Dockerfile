@@ -29,20 +29,11 @@ RUN npm config set registry https://registry.npmjs.org && \
 		npm config set unsafe-perm true && \
 		npm cache clean --force || true
 
-RUN set -eux; \
-	attempts=0; \
-	until [ $attempts -ge 3 ]; do \
-		npm install --silent --no-audit --no-fund --legacy-peer-deps && break || true; \
-		attempts=$((attempts+1)); \
-		echo "npm install failed, retrying ($attempts/3)"; \
-		sleep 3; \
-	done; \
-	if [ $attempts -ge 3 ]; then \
-		echo "npm install ultimately failed — dumping npm logs:"; \
-		ls -la /root/.npm/_logs || true; \
-		cat /root/.npm/_logs/*.log || true; \
-		exit 1; \
-	fi
+RUN if [ -f package-lock.json ]; then \
+			npm ci --silent; \
+		else \
+			npm install --silent --no-audit --no-fund --legacy-peer-deps; \
+		fi
 
 # Copy the rest of the app source and build
 COPY . ./
