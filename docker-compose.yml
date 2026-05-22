@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   postgres:
@@ -36,6 +36,21 @@ services:
       - minio_data:/data
     command: server /data --console-address ":9001"
     restart: always
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: wavo-api
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./apps/api/.env
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    restart: unless-stopped
 
 volumes:
   postgres_data:
