@@ -171,6 +171,7 @@ export default function DashboardLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isMinimized, setIsMinimized] = React.useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = React.useState(false);
+  const [isProfileOpen, setIsProfileOpen] = React.useState(false);
   const { user, logout, isLoading } = useAuth();
 
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
@@ -620,17 +621,80 @@ export default function DashboardLayout({
                 <Settings size={20} />
               </Link>
               <div className="h-4 w-[1px] bg-white/[0.1] mx-1" />
-              <Link href="/settings" className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary/20 to-primary/10 border border-white/10 p-[2px] hover:border-primary/50 transition-all overflow-hidden flex items-center justify-center">
-                <div className="w-full h-full rounded-full bg-[#1c1c1e] flex items-center justify-center overflow-hidden">
-                   <Image 
-                     src={`https://avatar.vercel.sh/${user?.email || 'wavo'}`} 
-                     alt="User Avatar"
-                     width={36}
-                     height={36}
-                     className="object-cover"
-                   />
-                </div>
-              </Link>
+              {/* Profile Dropdown */}
+              <div className="relative flex items-center">
+                <button 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary/20 to-primary/10 border border-white/10 p-[2px] hover:border-primary/50 transition-all overflow-hidden flex items-center justify-center cursor-pointer"
+                >
+                  <div className="w-full h-full rounded-full bg-[#1c1c1e] flex items-center justify-center overflow-hidden">
+                     <Image 
+                       src={`https://avatar.vercel.sh/${user?.email || 'wavo'}`} 
+                       alt="User Avatar"
+                       width={36}
+                       height={36}
+                       className="object-cover"
+                     />
+                  </div>
+                </button>
+
+                <AnimatePresence>
+                  {isProfileOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setIsProfileOpen(false)}
+                      />
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 top-full mt-3 w-[220px] bg-[#1c1c1e] border border-white/10 rounded-[24px] shadow-2xl z-50 overflow-hidden p-2"
+                      >
+                        {/* User Summary info */}
+                        <div className="px-4 py-3 border-b border-white/5 mb-1">
+                          <p className="text-[14px] font-bold text-white truncate">{user?.fullName || 'Wavo User'}</p>
+                          <p className="text-[11px] text-[#8e8e93]/70 truncate">{user?.email || ''}</p>
+                        </div>
+
+                        {/* Help link */}
+                        <Link 
+                          href="/dashboard/help" 
+                          onClick={() => setIsProfileOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 text-[14px] font-medium text-[#8e8e93] hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                        >
+                          <HelpCircle size={18} />
+                          <span>Help</span>
+                        </Link>
+
+                        {/* Settings link */}
+                        <Link 
+                          href="/settings" 
+                          onClick={() => setIsProfileOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 text-[14px] font-medium text-[#8e8e93] hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                        >
+                          <Settings size={18} />
+                          <span>Settings</span>
+                        </Link>
+
+                        <div className="h-[1px] bg-white/5 my-1" />
+
+                        {/* Logout button */}
+                        <button 
+                          onClick={() => {
+                            setIsProfileOpen(false);
+                            logout();
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-[14px] font-medium text-[#FF3B30] hover:bg-[#FF3B30]/10 rounded-xl transition-all text-left cursor-pointer"
+                        >
+                          <LogOut size={18} />
+                          <span>Sign Out</span>
+                        </button>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         </header>
