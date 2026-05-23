@@ -171,7 +171,7 @@ export default function DashboardLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isMinimized, setIsMinimized] = React.useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = React.useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
 
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   const [services, setServices] = React.useState<any[]>([]);
@@ -357,6 +357,27 @@ export default function DashboardLayout({
   };
 
   const hasUnread = notifications.some((n) => !n.read);
+
+  if (isLoading || !user) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#0a0a0c] text-white font-sans">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
+            <div className="absolute inset-2 rounded-full border-b-2 border-l-2 border-primary/30 animate-spin" style={{ animationDirection: 'reverse' }} />
+          </div>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            className="text-[14px] font-medium tracking-wider text-[#8e8e93] uppercase mt-2"
+          >
+            Loading Wavo...
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[#0a0a0c] text-white overflow-hidden font-sans">
@@ -595,11 +616,11 @@ export default function DashboardLayout({
                 </AnimatePresence>
               </div>
 
-              <button className="p-2 text-[#8e8e93] hover:text-white transition-colors">
+              <Link href="/settings" className="p-2 text-[#8e8e93] hover:text-white transition-colors">
                 <Settings size={20} />
-              </button>
+              </Link>
               <div className="h-4 w-[1px] bg-white/[0.1] mx-1" />
-              <button className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary/20 to-primary/10 border border-white/10 p-[2px] hover:border-primary/50 transition-all overflow-hidden">
+              <Link href="/settings" className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary/20 to-primary/10 border border-white/10 p-[2px] hover:border-primary/50 transition-all overflow-hidden flex items-center justify-center">
                 <div className="w-full h-full rounded-full bg-[#1c1c1e] flex items-center justify-center overflow-hidden">
                    <Image 
                      src={`https://avatar.vercel.sh/${user?.email || 'wavo'}`} 
@@ -609,7 +630,7 @@ export default function DashboardLayout({
                      className="object-cover"
                    />
                 </div>
-              </button>
+              </Link>
             </div>
           </div>
         </header>
