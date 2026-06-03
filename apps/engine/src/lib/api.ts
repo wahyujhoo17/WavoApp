@@ -70,7 +70,15 @@ export async function apiFetch<T>(
   
   // Attach token
   const headers = new Headers(options.headers || {});
-  if (options.body && !headers.has('Content-Type') && !(options.body instanceof FormData)) {
+  
+  // Default to empty JSON body for POST/PUT/PATCH requests to avoid 415 (Unsupported Media Type)
+  // errors when reverse proxies append text/plain or other types on empty POST bodies.
+  let body = options.body;
+  if (['POST', 'PUT', 'PATCH'].includes(options.method || '') && !body) {
+    body = JSON.stringify({});
+  }
+
+  if (body && !headers.has('Content-Type') && !(body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
   
@@ -81,6 +89,7 @@ export async function apiFetch<T>(
   
   const config = {
     ...options,
+    body,
     headers,
   };
 
