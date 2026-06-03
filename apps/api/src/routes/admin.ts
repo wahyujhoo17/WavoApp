@@ -306,7 +306,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
     const { email, password, fullName, role, plan } = parse.data;
 
     try {
-      const existingUser = await prisma.user.findUnique({
+      const existingUser = await prisma.user.findFirst({
         where: { email, deletedAt: null },
       });
 
@@ -433,7 +433,9 @@ export async function adminRoutes(fastify: FastifyInstance) {
           where: { id },
           data: {
             deletedAt: new Date(),
-            isActive: false
+            isActive: false,
+            email: `${targetUser.email}.deleted.${Date.now()}`,
+            googleId: targetUser.googleId ? `${targetUser.googleId}.deleted.${Date.now()}` : null
           }
         })
       ]);
