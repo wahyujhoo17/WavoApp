@@ -161,6 +161,11 @@ This spins up the entire stack:
 | `redis` | 6379 | Redis (BullMQ queues) |
 | `minio` | 9000 | Object storage |
 
+> ⚠️ **Important on Docker Environment Variables:** 
+> When running the application inside Docker containers, do not use `localhost` or `127.0.0.1` for external services like Database and Redis in your `.env`. Instead, use the container service names defined in `docker-compose.yml`:
+> - **Database URL**: `DATABASE_URL=postgresql://postgres:postgres_password@postgres:5432/wavo?schema=public`
+> - **Redis URL**: `REDIS_URL=redis://redis:6379`
+
 ### Dokploy Deployment
 
 See [DOKPLOY.md](./DOKPLOY.md) for detailed Dokploy deployment instructions.
@@ -229,18 +234,6 @@ curl -X POST http://localhost:4000/api/v1/send/text \
 | `POST` | `/api-keys` | Generate API key | JWT |
 
 > Full interactive API documentation available at the Dashboard → **Docs** page.
-
----
-
-## 🔑 Plan Tiers
-
-| Feature | Free | Pro | Business | Enterprise |
-|---------|------|-----|----------|------------|
-| WhatsApp Instances | 1 | 5 | 20 | Unlimited |
-| Daily Messages | 100 | 5,000 | 50,000 | Unlimited |
-| Bulk Messaging | ✕ | ✓ | ✓ | ✓ |
-| Max Bulk Recipients | — | 500 | 500 | 500 |
-| Queue Priority | Low | Medium | High | Highest |
 
 ---
 
