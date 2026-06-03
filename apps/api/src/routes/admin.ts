@@ -320,6 +320,20 @@ export async function adminRoutes(fastify: FastifyInstance) {
         });
       }
 
+      // Check if there is an old soft-deleted user with the same email and rename them to release unique constraint
+      const oldSoftDeletedUser = await prisma.user.findFirst({
+        where: { email, NOT: { deletedAt: null } }
+      });
+      if (oldSoftDeletedUser) {
+        await prisma.user.update({
+          where: { id: oldSoftDeletedUser.id },
+          data: {
+            email: `${oldSoftDeletedUser.email}.deleted.${Date.now()}`,
+            googleId: oldSoftDeletedUser.googleId ? `${oldSoftDeletedUser.googleId}.deleted.${Date.now()}` : null
+          }
+        });
+      }
+
       const passwordHash = await bcrypt.hash(password, 10);
 
       const newUser = await prisma.user.create({

@@ -51,13 +51,29 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
     const { email, password, fullName } = parse.data;
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findFirst({
+      where: { email, deletedAt: null }
+    });
     if (existingUser) {
       return reply.status(409).send({
         success: false,
         error: {
           code: 'CONFLICT',
           message: 'A user with this email address already exists'
+        }
+      });
+    }
+
+    // Check if there is an old soft-deleted user with the same email and rename them to release unique constraint
+    const oldSoftDeletedUser = await prisma.user.findFirst({
+      where: { email, NOT: { deletedAt: null } }
+    });
+    if (oldSoftDeletedUser) {
+      await prisma.user.update({
+        where: { id: oldSoftDeletedUser.id },
+        data: {
+          email: `${oldSoftDeletedUser.email}.deleted.${Date.now()}`,
+          googleId: oldSoftDeletedUser.googleId ? `${oldSoftDeletedUser.googleId}.deleted.${Date.now()}` : null
         }
       });
     }
