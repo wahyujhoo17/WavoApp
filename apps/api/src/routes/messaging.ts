@@ -239,7 +239,7 @@ export const messagingRoutes: FastifyPluginAsync = async (
 
       // Add slight staggered delay between queue additions
       await new Promise((resolve) =>
-        setTimeout(resolve, options.interMessageDelay * 100),
+        setTimeout(resolve, options.interMessageDelay * 1000),
       );
     }
 
