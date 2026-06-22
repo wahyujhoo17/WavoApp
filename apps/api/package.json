@@ -13,6 +13,7 @@
     "@fastify/cors": "^10.0.0",
     "@fastify/jwt": "^9.0.0",
     "@fastify/multipart": "^9.0.0",
+    "@fastify/rate-limit": "^11.0.0",
     "@whiskeysockets/baileys": "^6.7.9",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.8.0",

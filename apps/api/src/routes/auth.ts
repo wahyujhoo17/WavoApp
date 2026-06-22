@@ -37,7 +37,21 @@ const changePasswordSchema = z.object({
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   
   // POST /auth/register
-  fastify.post('/register', async (request, reply) => {
+  fastify.post('/register', {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '1 minute',
+        errorResponseBuilder: (request, context) => ({
+          success: false,
+          error: {
+            code: 'TOO_MANY_REQUESTS',
+            message: `Too many registration attempts. Please try again in ${context.after}.`
+          }
+        })
+      }
+    }
+  }, async (request, reply) => {
     const parse = registerSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({
@@ -135,7 +149,21 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   });
 
   // POST /auth/login
-  fastify.post('/login', async (request, reply) => {
+  fastify.post('/login', {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: '1 minute',
+        errorResponseBuilder: (request, context) => ({
+          success: false,
+          error: {
+            code: 'TOO_MANY_REQUESTS',
+            message: `Too many login attempts. Please try again in ${context.after}.`
+          }
+        })
+      }
+    }
+  }, async (request, reply) => {
     const parse = loginSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({

@@ -2,6 +2,8 @@ import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
+import IORedis from 'ioredis';
 import { Server as SocketServer } from 'socket.io';
 import http from 'http';
 import { env } from './config/env.js';
@@ -42,6 +44,29 @@ export async function createServer(): Promise<FastifyInstanceWithIO> {
   await fastify.register(cors, {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
+  // Setup Rate Limiting with Redis
+  const redisClient = new IORedis(env.REDIS_URL, {
+    maxRetriesPerRequest: null,
+  });
+
+  await fastify.register(rateLimit, {
+    global: true,
+    max: 300, // 300 requests per minute per IP globally
+    timeWindow: '1 minute',
+    redis: redisClient,
+    errorResponseBuilder: (request, context) => ({
+      success: false,
+      error: {
+        code: 'TOO_MANY_REQUESTS',
+        message: `Too many requests. Please try again in ${context.after}.`
+      }
+    })
+  });
+
+  fastify.addHook('onClose', async () => {
+    await redisClient.quit();
   });
 
   // Setup multipart (for image uploads)
