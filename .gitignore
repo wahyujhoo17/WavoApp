@@ -63,5 +63,4 @@ Desktop.ini
 .env
 .env.local
 
-# Landing page lives in its own repo: https://github.com/wahyujhoo17/wavo-landing-page
-apps/landing/
+

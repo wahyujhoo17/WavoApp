@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-background: #0a0a0c;
+  --color-on-background: #e6e0e9;
+  --color-surface: #141218;
+  --color-on-surface: #ffffff;
+  --color-primary: #cfbcff;
+  --color-on-primary: #381e72;
+  --color-primary-container: #6750a4;
+  --color-on-primary-container: #e0d2ff;
+  --color-secondary: #cdc0e9;
+  --color-on-secondary: #342b4b;
+  --color-surface-variant: #36343a;
+  --color-on-surface-variant: #cbc4d2;
+  --color-outline: #948e9c;
+  --color-outline-variant: #494551;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+
+  --font-inter: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --spacing-gutter: 24px;
+  --spacing-container-max: 1280px;
+
+  --shadow-glow-primary: 0 0 20px -5px var(--color-primary-container);
+  --shadow-glow-primary-lg: 0 0 40px -10px var(--color-primary-container);
+  --shadow-bento: 0 4px 24px -8px rgba(0,0,0,0.5);
+
+  --background-image-mesh-gradient: radial-gradient(at 40% 20%, hsla(258,80%,30%,0.15) 0px, transparent 50%), radial-gradient(at 80% 0%, hsla(276,70%,20%,0.15) 0px, transparent 50%), radial-gradient(at 0% 50%, hsla(240,60%,30%,0.15) 0px, transparent 50%);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --background: #0a0a0c;
+    --foreground: #e6e0e9;
+    --card: #211f24;
+    --card-foreground: #ffffff;
+    --popover: #2b292f;
+    --popover-foreground: #ffffff;
+    --primary: #cfbcff;
+    --primary-foreground: #381e72;
+    --secondary: #cdc0e9;
+    --secondary-foreground: #342b4b;
+    --muted: #36343a;
+    --muted-foreground: #cbc4d2;
+    --accent: #6750a4;
+    --accent-foreground: #e0d2ff;
+    --destructive: #ffb4ab;
+    --destructive-foreground: #690005;
+    --border: #494551;
+    --input: #494551;
+    --ring: #cfbcff;
+    --radius: 0.75rem;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-inter);
+    @apply antialiased;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .bento-card {
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .bento-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(207, 188, 255, 0.2);
+    box-shadow: 0 8px 32px -8px rgba(207, 188, 255, 0.1);
+  }
+
+  .grid-pattern {
+    background-size: 40px 40px;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+  }
+
+  .animate-spin-slow {
+    animation: spin 8s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+}
