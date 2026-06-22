@@ -170,14 +170,20 @@ export default function RegisterPage() {
             </p>
 
             <div className="grid grid-cols-2 gap-4 mb-8">
-              <button className="flex items-center justify-center gap-2 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-semibold text-xs uppercase tracking-widest hover:bg-white/10 transition-all">
+              <a 
+                href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/github`}
+                className="flex items-center justify-center gap-2 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-semibold text-xs uppercase tracking-widest hover:bg-white/10 transition-all text-center"
+              >
                 <Github size={18} />
                 Github
-              </button>
-              <button className="flex items-center justify-center gap-2 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-semibold text-xs uppercase tracking-widest hover:bg-white/10 transition-all">
+              </a>
+              <a 
+                href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/google`}
+                className="flex items-center justify-center gap-2 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-semibold text-xs uppercase tracking-widest hover:bg-white/10 transition-all text-center"
+              >
                 <GoogleIcon />
                 Google
-              </button>
+              </a>
             </div>
 
             <div className="relative mb-8">

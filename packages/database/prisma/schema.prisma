@@ -17,6 +17,7 @@ model User {
   plan            UserPlan  @default(FREE)
 
   googleId        String?   @unique
+  githubId        String?   @unique
 
   isActive        Boolean   @default(true)
   emailVerifiedAt DateTime?

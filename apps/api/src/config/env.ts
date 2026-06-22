@@ -37,6 +37,12 @@ const envSchema = z.object({
   // Frontend & App URLs
   FRONTEND_URL: z.string().default('http://localhost:3000'),
   API_URL: z.string().default('http://localhost:4000'),
+
+  // OAuth Credentials
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
   
   // Optional SMTP settings
   SMTP_HOST: z.string().optional(),

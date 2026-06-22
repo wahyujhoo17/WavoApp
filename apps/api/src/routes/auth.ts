@@ -3,6 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { prisma, UserRole, UserPlan } from 'database';
 import crypto from 'crypto';
+import { env } from '../config/env.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -530,5 +531,309 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         dailyUsage: dailyUsageCount
       }
     });
+  });
+
+  // GET /auth/google
+  fastify.get('/google', async (request, reply) => {
+    if (!env.GOOGLE_CLIENT_ID) {
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=google_not_configured`);
+    }
+    const redirectUri = `${env.API_URL}/api/v1/auth/google/callback`;
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20email`;
+    return reply.redirect(googleAuthUrl);
+  });
+
+  // GET /auth/google/callback
+  fastify.get('/google/callback', async (request: any, reply) => {
+    const { code } = request.query;
+    if (!code) {
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=code_missing`);
+    }
+
+    try {
+      const redirectUri = `${env.API_URL}/api/v1/auth/google/callback`;
+      
+      // Exchange code for token
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: env.GOOGLE_CLIENT_ID,
+          client_secret: env.GOOGLE_CLIENT_SECRET,
+          code,
+          grant_type: 'authorization_code',
+          redirect_uri: redirectUri
+        })
+      });
+
+      if (!tokenRes.ok) {
+        const errorText = await tokenRes.text();
+        fastify.log.error(`Google Token Exchange Error: ${errorText}`);
+        return reply.redirect(`${env.FRONTEND_URL}/login?error=token_exchange_failed`);
+      }
+
+      const tokenData: any = await tokenRes.json();
+      const accessToken = tokenData.access_token;
+
+      // Fetch user profile
+      const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+
+      if (!userRes.ok) {
+        return reply.redirect(`${env.FRONTEND_URL}/login?error=user_fetch_failed`);
+      }
+
+      const userData: any = await userRes.json();
+      const email = userData.email;
+      const fullName = userData.name || userData.given_name || 'Google User';
+      const googleId = userData.id;
+
+      if (!email) {
+        return reply.redirect(`${env.FRONTEND_URL}/login?error=email_missing`);
+      }
+
+      // Check user in database
+      let user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { googleId, deletedAt: null },
+            { email, deletedAt: null }
+          ]
+        }
+      });
+
+      if (user) {
+        if (!user.isActive) {
+          return reply.redirect(`${env.FRONTEND_URL}/login?suspended=true`);
+        }
+        
+        // If found by email but googleId was not set
+        if (!user.googleId) {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { googleId }
+          });
+        }
+      } else {
+        // Create user
+        user = await prisma.user.create({
+          data: {
+            email,
+            fullName,
+            googleId,
+            role: UserRole.USER,
+            plan: UserPlan.FREE,
+            emailVerifiedAt: new Date()
+          }
+        });
+      }
+
+      // Generate tokens
+      const clientAccessToken = fastify.jwt.sign({
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        plan: user.plan
+      });
+
+      const tokenFamily = crypto.randomUUID();
+      const clientRefreshToken = fastify.jwt.sign({
+        sub: user.id,
+        tokenFamily
+      }, { expiresIn: '7d' });
+
+      const hashedRefreshToken = crypto.createHash('sha256').update(clientRefreshToken).digest('hex');
+
+      await prisma.session.create({
+        data: {
+          userId: user.id,
+          refreshTokenHash: hashedRefreshToken,
+          tokenFamily,
+          userAgent: request.headers['user-agent'] || null,
+          ipAddress: request.ip,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      });
+
+      const frontendUser = {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        plan: user.plan
+      };
+
+      return reply.redirect(
+        `${env.FRONTEND_URL}/login/callback?token=${clientAccessToken}&refresh=${clientRefreshToken}&user=${encodeURIComponent(JSON.stringify(frontendUser))}`
+      );
+
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=internal_server_error`);
+    }
+  });
+
+  // GET /auth/github
+  fastify.get('/github', async (request, reply) => {
+    if (!env.GITHUB_CLIENT_ID) {
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=github_not_configured`);
+    }
+    const redirectUri = `${env.API_URL}/api/v1/auth/github/callback`;
+    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
+    return reply.redirect(githubAuthUrl);
+  });
+
+  // GET /auth/github/callback
+  fastify.get('/github/callback', async (request: any, reply) => {
+    const { code } = request.query;
+    if (!code) {
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=code_missing`);
+    }
+
+    try {
+      // Exchange code for token
+      const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          client_id: env.GITHUB_CLIENT_ID,
+          client_secret: env.GITHUB_CLIENT_SECRET,
+          code
+        })
+      });
+
+      if (!tokenRes.ok) {
+        return reply.redirect(`${env.FRONTEND_URL}/login?error=token_exchange_failed`);
+      }
+
+      const tokenData: any = await tokenRes.json();
+      const accessToken = tokenData.access_token;
+
+      if (!accessToken) {
+        return reply.redirect(`${env.FRONTEND_URL}/login?error=token_missing`);
+      }
+
+      // Fetch user profile
+      const userRes = await fetch('https://api.github.com/user', {
+        headers: { 
+          'Authorization': `Bearer ${accessToken}`,
+          'User-Agent': 'Wavo-OAuth'
+        }
+      });
+
+      if (!userRes.ok) {
+        return reply.redirect(`${env.FRONTEND_URL}/login?error=user_fetch_failed`);
+      }
+
+      const userData: any = await userRes.json();
+      const githubId = String(userData.id);
+      const fullName = userData.name || userData.login || 'GitHub User';
+      let email = userData.email;
+
+      // GitHub public email might be null, fetch private emails if so
+      if (!email) {
+        const emailsRes = await fetch('https://api.github.com/user/emails', {
+          headers: { 
+            'Authorization': `Bearer ${accessToken}`,
+            'User-Agent': 'Wavo-OAuth'
+          }
+        });
+
+        if (emailsRes.ok) {
+          const emails: any = await emailsRes.json();
+          const primaryEmail = emails.find((e: any) => e.primary && e.verified);
+          if (primaryEmail) {
+            email = primaryEmail.email;
+          }
+        }
+      }
+
+      if (!email) {
+        return reply.redirect(`${env.FRONTEND_URL}/login?error=email_missing`);
+      }
+
+      // Check user in database
+      let user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { githubId, deletedAt: null },
+            { email, deletedAt: null }
+          ]
+        }
+      });
+
+      if (user) {
+        if (!user.isActive) {
+          return reply.redirect(`${env.FRONTEND_URL}/login?suspended=true`);
+        }
+        
+        // If found by email but githubId was not set
+        if (!user.githubId) {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { githubId }
+          });
+        }
+      } else {
+        // Create user
+        user = await prisma.user.create({
+          data: {
+            email,
+            fullName,
+            githubId,
+            role: UserRole.USER,
+            plan: UserPlan.FREE,
+            emailVerifiedAt: new Date()
+          }
+        });
+      }
+
+      // Generate tokens
+      const clientAccessToken = fastify.jwt.sign({
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        plan: user.plan
+      });
+
+      const tokenFamily = crypto.randomUUID();
+      const clientRefreshToken = fastify.jwt.sign({
+        sub: user.id,
+        tokenFamily
+      }, { expiresIn: '7d' });
+
+      const hashedRefreshToken = crypto.createHash('sha256').update(clientRefreshToken).digest('hex');
+
+      await prisma.session.create({
+        data: {
+          userId: user.id,
+          refreshTokenHash: hashedRefreshToken,
+          tokenFamily,
+          userAgent: request.headers['user-agent'] || null,
+          ipAddress: request.ip,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      });
+
+      const frontendUser = {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        plan: user.plan
+      };
+
+      return reply.redirect(
+        `${env.FRONTEND_URL}/login/callback?token=${clientAccessToken}&refresh=${clientRefreshToken}&user=${encodeURIComponent(JSON.stringify(frontendUser))}`
+      );
+
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=internal_server_error`);
+    }
   });
 };
