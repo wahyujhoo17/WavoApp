@@ -553,7 +553,7 @@ export default function SettingsPage() {
             <div className="space-y-8 mt-6">
               <UsageBar label="Messages Sent" current={usageStats.messagesSent} max={limits.messages} color="bg-[#cfbcff]" />
               <UsageBar label="API Requests" current={usageStats.apiRequests} max={limits.apiRequests} color="bg-[#FFCC00]" />
-              <UsageBar label="Daily Usage" current={usageStats.dailyUsage} max={limits.daily} color="bg-[#34C759]" />
+              <UsageBar label="Daily Usage" current={usageStats.dailyUsage} max={usageStats.dailyLimit || limits.daily} color="bg-[#34C759]" />
               <div className="pt-6 border-t border-white/[0.03]">
                 <button 
                   onClick={() => toast.info("Subscription Management", "Subscription upgrades are currently managed by contacting support or your system administrator.")}

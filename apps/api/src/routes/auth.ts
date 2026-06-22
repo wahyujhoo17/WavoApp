@@ -523,12 +523,32 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       }
     });
 
+    // Resolve user plan and determine daily limit
+    const plan = request.user.plan || 'FREE';
+    let dailyLimit = 100;
+    if (plan === 'PRO') dailyLimit = 5000;
+    else if (plan === 'BUSINESS') dailyLimit = 50000;
+    else if (plan === 'ENTERPRISE') dailyLimit = 99999999;
+
+    try {
+      const configKey = `rate_limit.${plan.toLowerCase()}.daily`;
+      const systemConfig = await prisma.systemConfig.findUnique({
+        where: { key: configKey },
+      });
+      if (systemConfig && typeof systemConfig.value === 'number') {
+        dailyLimit = systemConfig.value;
+      }
+    } catch (err) {
+      // Fallback silently
+    }
+
     return reply.status(200).send({
       success: true,
       data: {
         messagesSent: messagesCount,
         apiRequests: apiRequestsCount,
-        dailyUsage: dailyUsageCount
+        dailyUsage: dailyUsageCount,
+        dailyLimit
       }
     });
   });
