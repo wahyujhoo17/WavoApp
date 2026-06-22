@@ -31,7 +31,6 @@ export const Navbar = () => {
           <div className="hidden md:flex gap-10">
             <Link className="text-[13px] font-medium text-on-surface-variant/80 hover:text-on-surface transition-colors duration-200" href="/features">Features</Link>
             <Link className="text-[13px] font-medium text-on-surface-variant/80 hover:text-on-surface transition-colors duration-200" href="/docs">Docs</Link>
-            <Link className="text-[13px] font-medium text-on-surface-variant/80 hover:text-on-surface transition-colors duration-200" href="#">Blog</Link>
           </div>
         </div>
         <div className="flex items-center gap-6">
