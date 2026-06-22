@@ -380,6 +380,17 @@ export default function DashboardLayout({
     );
   }
 
+  // Generate user initials
+  const initials = user?.fullName
+    ? user.fullName
+        .split(' ')
+        .filter(Boolean)
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : 'WA';
+
   return (
     <div className="flex h-screen bg-[#0a0a0c] text-white overflow-hidden font-sans">
       {/* Sidebar */}
@@ -627,14 +638,8 @@ export default function DashboardLayout({
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary/20 to-primary/10 border border-white/10 p-[2px] hover:border-primary/50 transition-all overflow-hidden flex items-center justify-center cursor-pointer"
                 >
-                  <div className="w-full h-full rounded-full bg-[#1c1c1e] flex items-center justify-center overflow-hidden">
-                     <Image 
-                       src={`https://avatar.vercel.sh/${user?.email || 'wavo'}`} 
-                       alt="User Avatar"
-                       width={36}
-                       height={36}
-                       className="object-cover"
-                     />
+                  <div className="w-full h-full rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[12px] tracking-wider select-none">
+                     {initials}
                   </div>
                 </button>
 
