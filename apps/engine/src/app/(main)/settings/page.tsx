@@ -116,6 +116,18 @@ const UsageBar = ({ label, current, max, color }: any) => {
   );
 };
 
+const PlainUsageStat = ({ label, value, color }: any) => {
+  return (
+    <div className="flex items-center justify-between p-4 bg-black/20 border border-white/5 rounded-2xl group hover:border-white/10 transition-all">
+      <div className="flex items-center gap-3">
+        <span className={`w-2 h-2 rounded-full ${color}`} />
+        <span className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-[0.15em]">{label}</span>
+      </div>
+      <span className="text-[16px] font-extrabold text-white">{value.toLocaleString()}</span>
+    </div>
+  );
+};
+
 export default function SettingsPage() {
   const { user, setUser } = useAuth();
   const { confirm } = useConfirmation();
@@ -551,8 +563,8 @@ export default function SettingsPage() {
         <div className="space-y-8">
           <Card title="Resource Usage" subtitle={`Consumption of your ${user?.plan || 'FREE'} plan.`}>
             <div className="space-y-8 mt-6">
-              <UsageBar label="Messages Sent" current={usageStats.messagesSent} max={limits.messages} color="bg-[#cfbcff]" />
-              <UsageBar label="API Requests" current={usageStats.apiRequests} max={limits.apiRequests} color="bg-[#FFCC00]" />
+              <PlainUsageStat label="Messages Sent" value={usageStats.messagesSent} color="bg-[#cfbcff]" />
+              <PlainUsageStat label="API Requests" value={usageStats.apiRequests} color="bg-[#FFCC00]" />
               <UsageBar label="Daily Usage" current={usageStats.dailyUsage} max={usageStats.dailyLimit || limits.daily} color="bg-[#34C759]" />
               <div className="pt-6 border-t border-white/[0.03]">
                 <button 
