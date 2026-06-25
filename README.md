@@ -20,24 +20,6 @@
   <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
 </p>
 
----
-
-## 📸 Screenshots
-
-<p align="center">
-  <img src="docs/images/dashboard.png" alt="Wavo Dashboard" width="100%" />
-</p>
-
-<p align="center">
-  <img src="docs/images/services.png" alt="Wavo WhatsApp Services" width="100%" />
-</p>
-
-<p align="center">
-  <img src="docs/images/logs.png" alt="Wavo API Traffic Logs" width="100%" />
-</p>
-
----
-
 ## ✨ Features
 
 | Feature | Description |
@@ -82,6 +64,22 @@ wavo-monorepo/
 | **Object Storage** | MinIO (S3-compatible) with local fallback |
 | **Auth** | JWT (access + refresh tokens), bcrypt, API keys |
 | **Runtime** | Node.js 20 |
+
+---
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="Wavo Dashboard" width="100%" />
+</p>
+
+<p align="center">
+  <img src="docs/images/services.png" alt="Wavo WhatsApp Services" width="100%" />
+</p>
+
+<p align="center">
+  <img src="docs/images/logs.png" alt="Wavo API Traffic Logs" width="100%" />
+</p>
 
 ---
 
