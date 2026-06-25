@@ -22,6 +22,22 @@
 
 ---
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="Wavo Dashboard" width="100%" />
+</p>
+
+<p align="center">
+  <img src="docs/images/services.png" alt="Wavo WhatsApp Services" width="100%" />
+</p>
+
+<p align="center">
+  <img src="docs/images/logs.png" alt="Wavo API Traffic Logs" width="100%" />
+</p>
+
+---
+
 ## ✨ Features
 
 | Feature | Description |
