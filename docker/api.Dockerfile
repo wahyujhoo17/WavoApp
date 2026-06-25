@@ -68,6 +68,12 @@ RUN cd packages/database && npx prisma generate
 
 EXPOSE 4000
 
-WORKDIR /app/apps/api
-# Run migrations, then start the API server
-CMD cd /app/packages/database && npx prisma migrate deploy && cd /app/apps/api && node dist/index.js
+WORKDIR /app
+
+# Copy and prepare entrypoint script
+COPY docker/entrypoint.sh /app/docker/entrypoint.sh
+RUN chmod +x /app/docker/entrypoint.sh
+
+EXPOSE 4000
+
+CMD ["/bin/sh", "/app/docker/entrypoint.sh"]

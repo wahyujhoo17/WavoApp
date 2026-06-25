@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, 
@@ -167,7 +168,10 @@ export default function SettingsPage() {
   const [isEnabling2fa, setIsEnabling2fa] = React.useState(false);
   const [isDisabling2fa, setIsDisabling2fa] = React.useState(false);
 
+  const [mounted, setMounted] = React.useState(false);
+
   React.useEffect(() => {
+    setMounted(true);
     if (!user) return;
     
     setFullName(user.fullName || '');
@@ -718,257 +722,260 @@ export default function SettingsPage() {
       </div>
       {renderContent()}
 
-      {/* Premium Key Generation Modal */}
-      <AnimatePresence>
-        {showNewKeyModal && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative"
-            >
-              <button 
-                onClick={() => setShowNewKeyModal(false)}
-                className="absolute right-6 top-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-[#8e8e93] hover:text-white transition-all"
+      {/* Premium Modals Rendered via Portal */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {showNewKeyModal && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
               >
-                <X size={18} />
-              </button>
+                <button 
+                  onClick={() => setShowNewKeyModal(false)}
+                  className="absolute right-6 top-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-[#8e8e93] hover:text-white transition-all"
+                >
+                  <X size={18} />
+                </button>
 
-              <div className="space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                  <Key size={24} />
+                <div className="space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                    <Key size={24} />
+                  </div>
+                  <h3 className="text-[22px] font-bold text-white tracking-tight">Generate API Key</h3>
+                  <p className="text-[14px] text-[#8e8e93] leading-relaxed">
+                    {!generatedKey 
+                      ? "Generate a secure token to authenticate your API calls for a specific WhatsApp service instance."
+                      : "Your new API key has been generated. Please copy and save it now — for security reasons, it cannot be shown again."}
+                  </p>
                 </div>
-                <h3 className="text-[22px] font-bold text-white tracking-tight">Generate API Key</h3>
-                <p className="text-[14px] text-[#8e8e93] leading-relaxed">
-                  {!generatedKey 
-                    ? "Generate a secure token to authenticate your API calls for a specific WhatsApp service instance."
-                    : "Your new API key has been generated. Please copy and save it now — for security reasons, it cannot be shown again."}
-                </p>
-              </div>
 
-              {!generatedKey ? (
-                <form onSubmit={handleCreateKey} className="space-y-6">
-                  <div className="space-y-3">
-                    <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider">Key Name</label>
+                {!generatedKey ? (
+                  <form onSubmit={handleCreateKey} className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider">Key Name</label>
+                      <input 
+                        type="text"
+                        placeholder="e.g. My Production Integration"
+                        value={newKeyName}
+                        onChange={(e) => setNewKeyName(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-[15px] outline-none focus:border-primary/40 transition-all font-medium"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider">WhatsApp Service Instance</label>
+                      <div className="relative">
+                        <select 
+                          value={newKeyServiceId}
+                          onChange={(e) => setNewKeyServiceId(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-[15px] outline-none appearance-none cursor-pointer focus:border-primary/40 transition-all font-medium"
+                        >
+                          {services.map(s => (
+                            <option key={s.id} value={s.id} className="bg-[#1c1c1e] text-white">
+                              {s.name} ({s.phoneNumber || 'Unlinked'})
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={20} className="absolute right-5 top-1/2 -translate-y-1/2 text-[#8e8e93] pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewKeyModal(false)}
+                        className="flex-1 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-bold text-[15px] transition-all active:scale-[0.98]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isGenerating}
+                        className="flex-1 py-4 bg-[#cfbcff] text-[#381e72] rounded-2xl font-bold text-[15px] hover:opacity-90 transition-all shadow-[0_0_30px_rgba(207,188,255,0.25)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
+                      >
+                        {isGenerating ? "Generating..." : "Generate Key"}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Generated Key Box */}
+                    <div className="p-5 bg-[#34C759]/5 border border-[#34C759]/20 rounded-2xl space-y-4">
+                      <div className="flex items-center gap-2.5 text-[#34C759] font-bold text-[14px]">
+                        <Check size={18} />
+                        Generated Successfully
+                      </div>
+                      <div className="flex items-center gap-3 bg-black/40 border border-white/5 rounded-xl p-4 font-mono text-[14px] text-white select-all break-all relative">
+                        <span className="flex-1 tracking-tight select-all">{generatedKey}</span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedKey);
+                            toast.info("Copied to Clipboard", "API key copied successfully.");
+                          }}
+                          className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all active:scale-95"
+                          title="Copy API Key"
+                        >
+                          <Copy size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-[#FFCC00]/5 border border-[#FFCC00]/20 rounded-2xl flex gap-3 text-[13px] text-[#FFCC00] leading-relaxed font-medium">
+                      <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                      <span>
+                        For your security, we only display this token once. Please make sure to copy it now and store it in a secure password manager.
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => setShowNewKeyModal(false)}
+                      className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-bold text-[15px] transition-all active:scale-[0.98]"
+                    >
+                      Done
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+
+          {show2faSetupModal && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
+              >
+                <button 
+                  onClick={() => setShow2faSetupModal(false)}
+                  className="absolute right-6 top-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-[#8e8e93] hover:text-white transition-all"
+                >
+                  <X size={18} />
+                </button>
+
+                <div className="space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-[#cfbcff]/10 border border-[#cfbcff]/20 flex items-center justify-center text-[#cfbcff]">
+                    <Shield size={24} />
+                  </div>
+                  <h3 className="text-[22px] font-bold text-white tracking-tight">Setup Two-Factor Authentication</h3>
+                  <p className="text-[14px] text-[#8e8e93] leading-relaxed">
+                    Scan the QR code below using Google Authenticator or another TOTP authenticator app.
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center justify-center bg-black/20 p-6 rounded-2xl border border-white/5">
+                  {twoFactorQrCode ? (
+                    <img src={twoFactorQrCode} alt="2FA QR Code" className="w-[180px] h-[180px] rounded-xl border border-white/10 p-2 bg-white" />
+                  ) : (
+                    <div className="w-[180px] h-[180px] rounded-xl border border-white/10 bg-white/5 animate-pulse" />
+                  )}
+                  <div className="mt-4 text-center space-y-1 w-full">
+                    <p className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">Secret Key</p>
+                    <p className="text-[14px] font-mono text-white select-all tracking-wider break-all bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">{twoFactorSecret}</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handle2faEnable} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider block px-1">Verification Code</label>
                     <input 
                       type="text"
-                      placeholder="e.g. My Production Integration"
-                      value={newKeyName}
-                      onChange={(e) => setNewKeyName(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-[15px] outline-none focus:border-primary/40 transition-all font-medium"
+                      maxLength={6}
+                      placeholder="Enter 6-digit OTP code"
+                      value={twoFactorVerifyCode}
+                      onChange={(e) => setTwoFactorVerifyCode(e.target.value.replace(/\D/g, ''))}
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-[15px] outline-none focus:border-[#cfbcff]/40 transition-all font-medium text-center tracking-[0.25em]"
                       required
                     />
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider">WhatsApp Service Instance</label>
-                    <div className="relative">
-                      <select 
-                        value={newKeyServiceId}
-                        onChange={(e) => setNewKeyServiceId(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-[15px] outline-none appearance-none cursor-pointer focus:border-primary/40 transition-all font-medium"
-                      >
-                        {services.map(s => (
-                          <option key={s.id} value={s.id} className="bg-[#1c1c1e] text-white">
-                            {s.name} ({s.phoneNumber || 'Unlinked'})
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={20} className="absolute right-5 top-1/2 -translate-y-1/2 text-[#8e8e93] pointer-events-none" />
-                    </div>
                   </div>
 
                   <div className="flex gap-4 pt-2">
                     <button
                       type="button"
-                      onClick={() => setShowNewKeyModal(false)}
+                      onClick={() => setShow2faSetupModal(false)}
+                      className="flex-1 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-bold text-[15px] transition-all active:scale-[0.98]"
+                    >
+                      Cancel
+                  </button>
+                    <button
+                      type="submit"
+                      disabled={isEnabling2fa || twoFactorVerifyCode.length !== 6}
+                      className="flex-1 py-4 bg-[#cfbcff] text-[#381e72] rounded-2xl font-bold text-[15px] hover:opacity-90 transition-all shadow-[0_0_30px_rgba(207,188,255,0.25)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
+                    >
+                      {isEnabling2fa ? "Verifying..." : "Enable 2FA"}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+
+          {show2faDisableModal && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
+              >
+                <button 
+                  onClick={() => setShow2faDisableModal(false)}
+                  className="absolute right-6 top-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-[#8e8e93] hover:text-white transition-all"
+                >
+                  <X size={18} />
+                </button>
+
+                <div className="space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                    <Shield size={24} />
+                  </div>
+                  <h3 className="text-[22px] font-bold text-white tracking-tight">Disable Two-Factor Authentication</h3>
+                  <p className="text-[14px] text-[#8e8e93] leading-relaxed">
+                    To protect your account, please enter your password to disable 2FA.
+                  </p>
+                </div>
+
+                <form onSubmit={handle2faDisable} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider block px-1">Confirm Password</label>
+                    <input 
+                      type="password"
+                      placeholder="Enter your current password"
+                      value={twoFactorDisablePassword}
+                      onChange={(e) => setTwoFactorDisablePassword(e.target.value)}
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-[15px] outline-none focus:border-red-500/40 transition-all font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex gap-4 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShow2faDisableModal(false)}
                       className="flex-1 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-bold text-[15px] transition-all active:scale-[0.98]"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      disabled={isGenerating}
-                      className="flex-1 py-4 bg-[#cfbcff] text-[#381e72] rounded-2xl font-bold text-[15px] hover:opacity-90 transition-all shadow-[0_0_30px_rgba(207,188,255,0.25)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
+                      disabled={isDisabling2fa || !twoFactorDisablePassword}
+                      className="flex-1 py-4 bg-red-500 text-white rounded-2xl font-bold text-[15px] hover:opacity-90 transition-all shadow-[0_0_30px_rgba(239,68,68,0.25)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
                     >
-                      {isGenerating ? "Generating..." : "Generate Key"}
+                      {isDisabling2fa ? "Disabling..." : "Disable 2FA"}
                     </button>
                   </div>
                 </form>
-              ) : (
-                <div className="space-y-6">
-                  {/* Generated Key Box */}
-                  <div className="p-5 bg-[#34C759]/5 border border-[#34C759]/20 rounded-2xl space-y-4">
-                    <div className="flex items-center gap-2.5 text-[#34C759] font-bold text-[14px]">
-                      <Check size={18} />
-                      Generated Successfully
-                    </div>
-                    <div className="flex items-center gap-3 bg-black/40 border border-white/5 rounded-xl p-4 font-mono text-[14px] text-white select-all break-all relative">
-                      <span className="flex-1 tracking-tight select-all">{generatedKey}</span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(generatedKey);
-                          toast.info("Copied to Clipboard", "API key copied successfully.");
-                        }}
-                        className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-all active:scale-95"
-                        title="Copy API Key"
-                      >
-                        <Copy size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-[#FFCC00]/5 border border-[#FFCC00]/20 rounded-2xl flex gap-3 text-[13px] text-[#FFCC00] leading-relaxed font-medium">
-                    <AlertCircle size={20} className="shrink-0 mt-0.5" />
-                    <span>
-                      For your security, we only display this token once. Please make sure to copy it now and store it in a secure password manager.
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={() => setShowNewKeyModal(false)}
-                    className="w-full py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-bold text-[15px] transition-all active:scale-[0.98]"
-                  >
-                    Done
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-
-        {show2faSetupModal && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative"
-            >
-              <button 
-                onClick={() => setShow2faSetupModal(false)}
-                className="absolute right-6 top-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-[#8e8e93] hover:text-white transition-all"
-              >
-                <X size={18} />
-              </button>
-
-              <div className="space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-[#cfbcff]/10 border border-[#cfbcff]/20 flex items-center justify-center text-[#cfbcff]">
-                  <Shield size={24} />
-                </div>
-                <h3 className="text-[22px] font-bold text-white tracking-tight">Setup Two-Factor Authentication</h3>
-                <p className="text-[14px] text-[#8e8e93] leading-relaxed">
-                  Scan the QR code below using Google Authenticator or another TOTP authenticator app.
-                </p>
-              </div>
-
-              <div className="flex flex-col items-center justify-center bg-black/20 p-6 rounded-2xl border border-white/5">
-                {twoFactorQrCode ? (
-                  <img src={twoFactorQrCode} alt="2FA QR Code" className="w-[180px] h-[180px] rounded-xl border border-white/10 p-2 bg-white" />
-                ) : (
-                  <div className="w-[180px] h-[180px] rounded-xl border border-white/10 bg-white/5 animate-pulse" />
-                )}
-                <div className="mt-4 text-center space-y-1 w-full">
-                  <p className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">Secret Key</p>
-                  <p className="text-[14px] font-mono text-white select-all tracking-wider break-all bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">{twoFactorSecret}</p>
-                </div>
-              </div>
-
-              <form onSubmit={handle2faEnable} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider block px-1">Verification Code</label>
-                  <input 
-                    type="text"
-                    maxLength={6}
-                    placeholder="Enter 6-digit OTP code"
-                    value={twoFactorVerifyCode}
-                    onChange={(e) => setTwoFactorVerifyCode(e.target.value.replace(/\D/g, ''))}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-[15px] outline-none focus:border-[#cfbcff]/40 transition-all font-medium text-center tracking-[0.25em]"
-                    required
-                  />
-                </div>
-
-                <div className="flex gap-4 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShow2faSetupModal(false)}
-                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-bold text-[15px] transition-all active:scale-[0.98]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isEnabling2fa || twoFactorVerifyCode.length !== 6}
-                    className="flex-1 py-4 bg-[#cfbcff] text-[#381e72] rounded-2xl font-bold text-[15px] hover:opacity-90 transition-all shadow-[0_0_30px_rgba(207,188,255,0.25)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
-                  >
-                    {isEnabling2fa ? "Verifying..." : "Enable 2FA"}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-
-        {show2faDisableModal && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative"
-            >
-              <button 
-                onClick={() => setShow2faDisableModal(false)}
-                className="absolute right-6 top-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-[#8e8e93] hover:text-white transition-all"
-              >
-                <X size={18} />
-              </button>
-
-              <div className="space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
-                  <Shield size={24} />
-                </div>
-                <h3 className="text-[22px] font-bold text-white tracking-tight">Disable Two-Factor Authentication</h3>
-                <p className="text-[14px] text-[#8e8e93] leading-relaxed">
-                  To protect your account, please enter your password to disable 2FA.
-                </p>
-              </div>
-
-              <form onSubmit={handle2faDisable} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider block px-1">Confirm Password</label>
-                  <input 
-                    type="password"
-                    placeholder="Enter your current password"
-                    value={twoFactorDisablePassword}
-                    onChange={(e) => setTwoFactorDisablePassword(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-[15px] outline-none focus:border-red-500/40 transition-all font-medium"
-                    required
-                  />
-                </div>
-
-                <div className="flex gap-4 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShow2faDisableModal(false)}
-                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-bold text-[15px] transition-all active:scale-[0.98]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isDisabling2fa || !twoFactorDisablePassword}
-                    className="flex-1 py-4 bg-red-500 text-white rounded-2xl font-bold text-[15px] hover:opacity-90 transition-all shadow-[0_0_30px_rgba(239,68,68,0.25)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
-                  >
-                    {isDisabling2fa ? "Disabling..." : "Disable 2FA"}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
