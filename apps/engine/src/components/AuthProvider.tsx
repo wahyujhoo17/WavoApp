@@ -37,10 +37,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initializeAuth = async () => {
       try {
         const token = getAccessToken();
-        const storedUser = localStorage.getItem('wavo_user');
-        
-        if (token && storedUser) {
-          setUser(JSON.parse(storedUser));
+        if (token) {
+          // Fetch fresh user profile from API to prevent stale data (e.g. 2FA state)
+          const res = await apiFetch<{ user: User }>('/auth/me');
+          if (res.success && res.data?.user) {
+            localStorage.setItem('wavo_user', JSON.stringify(res.data.user));
+            setUser(res.data.user);
+          } else {
+            // Fallback to local storage if API fails or offline
+            const storedUser = localStorage.getItem('wavo_user');
+            if (storedUser) {
+              setUser(JSON.parse(storedUser));
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to restore session", err);

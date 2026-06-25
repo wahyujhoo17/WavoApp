@@ -434,6 +434,32 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     });
   });
 
+  // GET /auth/me (Authenticated)
+  fastify.get('/me', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
+    const userId = request.user.sub;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'User not found' }
+      });
+    }
+
+    return reply.status(200).send({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          plan: user.plan,
+          twoFactorEnabled: user.twoFactorEnabled
+        }
+      }
+    });
+  });
+
   // PUT /auth/profile (Authenticated)
   fastify.put('/profile', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
     const parse = updateProfileSchema.safeParse(request.body);
