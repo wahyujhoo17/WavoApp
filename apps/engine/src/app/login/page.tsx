@@ -9,6 +9,7 @@ import { Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { apiFetch, setTokens } from '@/lib/api';
 
 const Github = ({ size = 18, ...props }: { size?: number; [key: string]: any }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -30,6 +31,12 @@ export default function LoginPage() {
   const [emailError, setEmailError] = React.useState<string | null>(null);
   const [passwordError, setPasswordError] = React.useState<string | null>(null);
   const { login, isLoading } = useAuth();
+
+  // 2FA States
+  const [requires2fa, setRequires2fa] = React.useState(false);
+  const [tempToken, setTempToken] = React.useState<string | null>(null);
+  const [otpCode, setOtpCode] = React.useState('');
+  const [isVerifyingOtp, setIsVerifyingOtp] = React.useState(false);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -67,7 +74,13 @@ export default function LoginPage() {
     setPasswordError(null);
 
     const result = await login(email, password);
-    if (!result.success) {
+    if (result.success) {
+      if ((result as any).requires2FA) {
+        setRequires2fa(true);
+        setTempToken((result as any).tempToken);
+        toast.info("Two-Factor Authentication", "Please enter the 6-digit OTP from your authenticator app.");
+      }
+    } else {
       if (result.code === 'EMAIL_NOT_FOUND') {
         setEmailError(result.error || "Email address is not registered.");
       } else if (result.code === 'INVALID_PASSWORD') {
@@ -75,6 +88,29 @@ export default function LoginPage() {
       } else {
         setError(result.error || "Invalid email address or password. Please try again.");
       }
+    }
+  };
+
+  const handleOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.length !== 6 || !tempToken) return;
+
+    setError(null);
+    setIsVerifyingOtp(true);
+    const res = await apiFetch<any>('/auth/login/verify-2fa', {
+      method: 'POST',
+      body: JSON.stringify({ tempToken, code: otpCode })
+    });
+    setIsVerifyingOtp(false);
+
+    if (res.success && res.data) {
+      const { user: loggedInUser, accessToken, refreshToken } = res.data;
+      setTokens(accessToken, refreshToken);
+      localStorage.setItem('wavo_user', JSON.stringify(loggedInUser));
+      toast.success("Login Successful", `Welcome back, ${loggedInUser.fullName}!`);
+      window.location.href = '/dashboard';
+    } else {
+      setError(res.error?.message || "Invalid or expired OTP code.");
     }
   };
 
@@ -103,106 +139,159 @@ export default function LoginPage() {
               Log in to your developer console to manage your WhatsApp integrations.
             </p>
 
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <a 
-                href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/github`}
-                className="flex items-center justify-center gap-2 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-semibold text-xs uppercase tracking-widest hover:bg-white/10 transition-all text-center"
-              >
-                <Github size={18} />
-                Github
-              </a>
-              <a 
-                href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/google`}
-                className="flex items-center justify-center gap-2 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-semibold text-xs uppercase tracking-widest hover:bg-white/10 transition-all text-center"
-              >
-                <GoogleIcon />
-                Google
-              </a>
-            </div>
-
-            <div className="relative mb-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/5"></div>
-              </div>
-              <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em] font-bold text-on-surface-variant/40">
-                <span className="bg-[#0f0f12] px-4">Or continue with email</span>
-              </div>
-            </div>
-
-            <form className="space-y-5" onSubmit={handleLogin}>
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest block px-1">Email Address</label>
-                <input 
-                  type="email" 
-                  required
-                  value={email}
-                  onChange={handleEmailChange}
-                  placeholder="dev@example.com"
-                  className={cn(
-                    "w-full bg-black/40 border rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none transition-all",
-                    emailError 
-                      ? "border-red-500/30 focus:border-red-500/60" 
-                      : "border-white/5 focus:border-primary/40"
-                  )}
-                />
-                {emailError && (
-                  <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{emailError}</span>
-                )}
-              </div>
-
-              <div className="space-y-2 relative">
-                <div className="flex justify-between items-center px-1">
-                  <label className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Password</label>
-                  <Link href="#" className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest hover:text-primary transition-colors">Forgot Password?</Link>
-                </div>
-                <div className="relative">
+            {requires2fa ? (
+              <form className="space-y-6" onSubmit={handleOtpSubmit}>
+                <div className="space-y-3">
+                  <label className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest block px-1">
+                    Enter Verification Code
+                  </label>
+                  <p className="text-xs text-on-surface-variant/60 leading-relaxed px-1">
+                    Enter the 6-digit code generated by your authenticator app to complete sign in.
+                  </p>
                   <input 
-                    type={showPass ? "text" : "password"} 
+                    type="text" 
                     required
-                    value={password}
-                    onChange={handlePasswordChange}
-                    placeholder="••••••••"
-                    className={cn(
-                      "w-full bg-black/40 border rounded-xl px-4 py-3.5 pr-12 text-white text-sm focus:outline-none transition-all",
-                      passwordError 
-                        ? "border-red-500/30 focus:border-red-500/60" 
-                        : "border-white/5 focus:border-primary/40"
-                    )}
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 123456"
+                    className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 text-center text-xl font-bold tracking-[0.5em] text-white focus:outline-none focus:border-primary/40 transition-all placeholder:tracking-normal placeholder:font-normal placeholder:text-sm"
                   />
-                  <button 
-                    type="button"
-                    onClick={() => setShowPass(!showPass)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 hover:text-white transition-colors"
-                  >
-                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
                 </div>
-                {passwordError && (
-                  <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{passwordError}</span>
+
+                {error && (
+                  <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs font-bold flex items-center gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
+                    <span>{error}</span>
+                  </div>
                 )}
-              </div>
 
-              <div className="flex items-center gap-3 px-1 py-1">
-                <input type="checkbox" className="w-4 h-4 rounded border-white/10 bg-white/5 accent-primary cursor-pointer" />
-                <span className="text-xs font-medium text-on-surface-variant/60">Remember this device for 30 days</span>
-              </div>
+                <button 
+                  type="submit"
+                  disabled={isVerifyingOtp || otpCode.length !== 6}
+                  className="w-full bg-primary/20 text-primary py-4 rounded-xl font-bold text-sm hover:bg-primary/30 transition-all flex items-center justify-center gap-2 group mt-4 disabled:opacity-50"
+                >
+                  {isVerifyingOtp ? "Verifying..." : "Verify & Sign In"}
+                  {!isVerifyingOtp && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
+                </button>
 
-              {error && (
-                <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs font-bold flex items-center gap-2.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
-                  <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequires2fa(false);
+                    setTempToken(null);
+                    setOtpCode('');
+                    setError(null);
+                  }}
+                  className="w-full text-center text-xs font-bold text-[#cfbcff] hover:underline uppercase tracking-widest transition-all py-2"
+                >
+                  Back to login
+                </button>
+              </form>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <a 
+                    href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/github`}
+                    className="flex items-center justify-center gap-2 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-semibold text-xs uppercase tracking-widest hover:bg-white/10 transition-all text-center"
+                  >
+                    <Github size={18} />
+                    Github
+                  </a>
+                  <a 
+                    href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/google`}
+                    className="flex items-center justify-center gap-2 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-semibold text-xs uppercase tracking-widest hover:bg-white/10 transition-all text-center"
+                  >
+                    <GoogleIcon />
+                    Google
+                  </a>
                 </div>
-              )}
 
-              <button 
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-primary/20 text-primary py-4 rounded-xl font-bold text-sm hover:bg-primary/30 transition-all flex items-center justify-center gap-2 group mt-4 disabled:opacity-50"
-              >
-                {isLoading ? "Signing In..." : "Sign In"}
-                {!isLoading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
-              </button>
-            </form>
+                <div className="relative mb-8">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-white/5"></div>
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em] font-bold text-on-surface-variant/40">
+                    <span className="bg-[#0f0f12] px-4">Or continue with email</span>
+                  </div>
+                </div>
+
+                <form className="space-y-5" onSubmit={handleLogin}>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest block px-1">Email Address</label>
+                    <input 
+                      type="email" 
+                      required
+                      value={email}
+                      onChange={handleEmailChange}
+                      placeholder="dev@example.com"
+                      className={cn(
+                        "w-full bg-black/40 border rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none transition-all",
+                        emailError 
+                          ? "border-red-500/30 focus:border-red-500/60" 
+                          : "border-white/5 focus:border-primary/40"
+                      )}
+                    />
+                    {emailError && (
+                      <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{emailError}</span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 relative">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Password</label>
+                      <Link href="#" className="text-[11px] font-bold text-on-surface-variant/40 uppercase tracking-widest hover:text-primary transition-colors">Forgot Password?</Link>
+                    </div>
+                    <div className="relative">
+                      <input 
+                        type={showPass ? "text" : "password"} 
+                        required
+                        value={password}
+                        onChange={handlePasswordChange}
+                        placeholder="••••••••"
+                        className={cn(
+                          "w-full bg-black/40 border rounded-xl px-4 py-3.5 pr-12 text-white text-sm focus:outline-none transition-all",
+                          passwordError 
+                            ? "border-red-500/30 focus:border-red-500/60" 
+                            : "border-white/5 focus:border-primary/40"
+                        )}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => setShowPass(!showPass)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/30 hover:text-white transition-colors"
+                      >
+                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {passwordError && (
+                      <span className="text-red-500 text-xs font-semibold mt-1 px-1 block">{passwordError}</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 px-1 py-1">
+                    <input type="checkbox" className="w-4 h-4 rounded border-white/10 bg-white/5 accent-primary cursor-pointer" />
+                    <span className="text-xs font-medium text-on-surface-variant/60">Remember this device for 30 days</span>
+                  </div>
+
+                  {error && (
+                    <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs font-bold flex items-center gap-2.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full bg-primary/20 text-primary py-4 rounded-xl font-bold text-sm hover:bg-primary/30 transition-all flex items-center justify-center gap-2 group mt-4 disabled:opacity-50"
+                  >
+                    {isLoading ? "Signing In..." : "Sign In"}
+                    {!isLoading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
 
           <div className="flex justify-center items-center text-[11px] font-medium text-on-surface-variant/40 mt-4">

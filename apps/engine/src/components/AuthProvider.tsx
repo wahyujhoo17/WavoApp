@@ -10,6 +10,8 @@ export interface User {
   fullName: string;
   role: string;
   plan: string;
+  twoFactorEnabled?: boolean;
+  twoFactorSecret?: string;
 }
 
 interface AuthContextType {
@@ -77,7 +79,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
 
     if (res.success && res.data) {
-      const { user: loggedInUser, accessToken, refreshToken } = res.data;
+      if ((res.data as any).requires2FA) {
+        setIsLoading(false);
+        return { success: true, requires2FA: true, tempToken: (res.data as any).tempToken } as any;
+      }
+      const { user: loggedInUser, accessToken, refreshToken } = res.data as any;
       setTokens(accessToken, refreshToken);
       localStorage.setItem('wavo_user', JSON.stringify(loggedInUser));
       setUser(loggedInUser);

@@ -22,6 +22,8 @@ model User {
   isActive        Boolean   @default(true)
   emailVerifiedAt DateTime?
   lastLoginAt     DateTime?
+  twoFactorSecret String?
+  twoFactorEnabled Boolean   @default(false)
 
   services        WhatsAppService[]
   apiKeys         ApiKey[]

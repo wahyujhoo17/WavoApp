@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma, UserRole, UserPlan } from 'database';
 import crypto from 'crypto';
 import { env } from '../config/env.js';
+import { generateSecret, verifyTOTP, getOTPAuthURI, generateQRCodeDataURI } from '../lib/totp.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -32,6 +33,19 @@ const updateProfileSchema = z.object({
 const changePasswordSchema = z.object({
   oldPassword: z.string(),
   newPassword: z.string().min(8),
+});
+
+const verify2faSchema = z.object({
+  tempToken: z.string(),
+  code: z.string().length(6),
+});
+
+const enable2faSchema = z.object({
+  code: z.string().length(6),
+});
+
+const disable2faSchema = z.object({
+  password: z.string(),
 });
 
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -216,6 +230,21 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         error: {
           code: 'INVALID_PASSWORD',
           message: 'The password you entered is incorrect.'
+        }
+      });
+    }
+
+    if (user.twoFactorEnabled) {
+      const tempToken = fastify.jwt.sign({
+        sub: user.id,
+        requires2FA: true
+      }, { expiresIn: '5m' });
+
+      return reply.status(200).send({
+        success: true,
+        data: {
+          requires2FA: true,
+          tempToken
         }
       });
     }
@@ -883,5 +912,244 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       fastify.log.error(err);
       return reply.redirect(`${env.FRONTEND_URL}/login?error=internal_server_error`);
     }
+  });
+
+  // POST /auth/login/verify-2fa
+  fastify.post('/login/verify-2fa', async (request, reply) => {
+    const parse = verify2faSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid 2FA verification parameters',
+          details: parse.error.format()
+        }
+      });
+    }
+
+    const { tempToken, code } = parse.data;
+
+    let payload: any;
+    try {
+      payload = fastify.jwt.verify(tempToken);
+    } catch (err) {
+      return reply.status(401).send({
+        success: false,
+        error: {
+          code: 'TOKEN_EXPIRED',
+          message: 'Verification session has expired. Please log in again.'
+        }
+      });
+    }
+
+    if (!payload.requires2FA || !payload.sub) {
+      return reply.status(401).send({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Invalid verification token'
+        }
+      });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || !user.isActive) {
+      return reply.status(401).send({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'User account is inactive or not found'
+        }
+      });
+    }
+
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: '2FA is not enabled for this user'
+        }
+      });
+    }
+
+    const isValid = verifyTOTP(code, user.twoFactorSecret);
+    if (!isValid) {
+      return reply.status(401).send({
+        success: false,
+        error: {
+          code: 'INVALID_OTP',
+          message: 'The code you entered is invalid. Please try again.'
+        }
+      });
+    }
+
+    // Update login timestamp
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() }
+    });
+
+    // Generate tokens
+    const accessToken = fastify.jwt.sign({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      plan: user.plan
+    });
+
+    const tokenFamily = crypto.randomUUID();
+    const refreshToken = fastify.jwt.sign({
+      sub: user.id,
+      tokenFamily
+    }, { expiresIn: '7d' });
+
+    const hashedRefreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+    await prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshTokenHash: hashedRefreshToken,
+        tokenFamily,
+        userAgent: request.headers['user-agent'] || null,
+        ipAddress: request.ip,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      }
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          plan: user.plan
+        },
+        accessToken,
+        refreshToken
+      }
+    });
+  });
+
+  // POST /auth/2fa/setup (Authenticated)
+  fastify.post('/2fa/setup', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
+    const userId = request.user.sub;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'User not found' }
+      });
+    }
+
+    const secret = generateSecret();
+    const uri = getOTPAuthURI(user.email, 'ConnectAPI', secret);
+    const qrCode = await generateQRCodeDataURI(uri);
+
+    // Save secret temporarily in db (not enabled yet)
+    await prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: secret }
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: {
+        secret,
+        qrCode
+      }
+    });
+  });
+
+  // POST /auth/2fa/enable (Authenticated)
+  fastify.post('/2fa/enable', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
+    const parse = enable2faSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid parameters',
+          details: parse.error.format()
+        }
+      });
+    }
+
+    const userId = request.user.sub;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.twoFactorSecret) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'BAD_REQUEST', message: '2FA has not been setup yet.' }
+      });
+    }
+
+    const { code } = parse.data;
+    const isValid = verifyTOTP(code, user.twoFactorSecret);
+    if (!isValid) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'INVALID_OTP', message: 'The code you entered is invalid. Please try again.' }
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorEnabled: true }
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: { message: 'Two-factor authentication enabled successfully.' }
+    });
+  });
+
+  // POST /auth/2fa/disable (Authenticated)
+  fastify.post('/2fa/disable', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
+    const parse = disable2faSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid parameters',
+          details: parse.error.format()
+        }
+      });
+    }
+
+    const userId = request.user.sub;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.passwordHash) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'User not found.' }
+      });
+    }
+
+    const { password } = parse.data;
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) {
+      return reply.status(401).send({
+        success: false,
+        error: { code: 'INVALID_PASSWORD', message: 'The password you entered is incorrect.' }
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null
+      }
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: { message: 'Two-factor authentication disabled successfully.' }
+    });
   });
 };
