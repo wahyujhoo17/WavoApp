@@ -1046,7 +1046,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     const secret = generateSecret();
-    const uri = getOTPAuthURI(user.email, 'ConnectAPI', secret);
+    const uri = getOTPAuthURI(user.email, 'Wavo', secret);
     const qrCode = await generateQRCodeDataURI(uri);
 
     // Save secret temporarily in db (not enabled yet)
