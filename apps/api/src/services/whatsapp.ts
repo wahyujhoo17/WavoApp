@@ -195,7 +195,14 @@ export class WhatsAppServiceManager {
 
       for (const msg of m.messages) {
         if (!msg.key.fromMe && msg.message) {
-          const from = msg.key.remoteJid?.split('@')[0] || '';
+          // In groups, remoteJid is the group ID and participant is the actual sender
+          const senderJid = msg.key.participant || msg.key.remoteJid;
+          const from = senderJid?.split('@')[0] || '';
+          
+          // Also capture the group ID if it's from a group
+          const isGroup = msg.key.remoteJid?.endsWith('@g.us');
+          const groupId = isGroup ? msg.key.remoteJid?.split('@')[0] : null;
+
           const body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
           
           if (!body) continue;
