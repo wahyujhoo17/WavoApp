@@ -58,7 +58,7 @@ export const logsRoutes: FastPluginAsync = async (fastify: FastifyInstance) => {
 
     if (cursor) {
       skip = 1;
-      cursorObj = { id: BigInt(cursor) };
+      cursorObj = { id: cursor };
     }
 
     const logs = await prisma.messageLog.findMany({

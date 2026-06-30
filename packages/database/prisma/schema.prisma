@@ -154,7 +154,7 @@ model WebhookConfig {
 }
 
 model WebhookDeliveryLog {
-  id            BigInt   @id @default(autoincrement())
+  id            String   @id @default(uuid())
   webhookId     String
   webhook       WebhookConfig @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
@@ -184,7 +184,7 @@ enum DeliveryStatus {
 }
 
 model MessageLog {
-  id            BigInt          @id @default(autoincrement())
+  id            String          @id @default(uuid())
   serviceId     String
   service       WhatsAppService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
