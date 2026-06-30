@@ -73,10 +73,11 @@ export async function queueMessage(
     }
   );
 
-  // Update BullMQ Job ID reference in Database with queue-prefixed name to avoid collisions
+  // Update BullMQ Job ID reference in Database
+  // Use dbJob.id (UUID) as suffix to guarantee global uniqueness, even if BullMQ job.id collides after Redis restart
   await prisma.queueJob.update({
     where: { id: dbJob.id },
-    data: { bullJobId: `${queueName}:${job.id || crypto.randomUUID()}` }
+    data: { bullJobId: `${queueName}:${job.id}:${dbJob.id}` }
   });
 
   // Create initial message log in DB
