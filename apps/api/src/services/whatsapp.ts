@@ -6,6 +6,7 @@ import makeWASocket, {
   delay
 } from '@whiskeysockets/baileys';
 import { prisma, ServiceStatus } from 'database';
+import { nanoid } from 'nanoid';
 import path from 'path';
 import fs from 'fs/promises';
 import { Boom } from '@hapi/boom';
@@ -222,6 +223,7 @@ export class WhatsAppServiceManager {
           try {
             await prisma.messageLog.create({
               data: {
+                id: `log_${nanoid(10)}`,
                 serviceId,
                 direction: 'INBOUND',
                 messageType: 'TEXT',

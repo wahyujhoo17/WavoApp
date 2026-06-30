@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma, ServiceStatus, UserPlan } from "database";
 import { queueMessage, freeQueue } from "../services/queue.js";
 import { whatsAppServiceManager } from "../services/whatsapp.js";
+import { nanoid } from "nanoid";
 
 const textMessageSchema = z.object({
   serviceId: z.string().uuid(),
@@ -321,6 +322,7 @@ export const messagingRoutes: FastifyPluginAsync = async (
 
       const dbLog = await prisma.messageLog.create({
         data: {
+          id: `log_${nanoid(10)}`,
           serviceId,
           direction: "OUTBOUND",
           messageType: "IMAGE",

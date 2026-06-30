@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { prisma } from "database";
 import crypto from "crypto";
+import { nanoid } from "nanoid";
 
 const logsQuerySchema = z.object({
   serviceId: z.string().uuid(),
@@ -446,6 +447,7 @@ export const logsRoutes: FastPluginAsync = async (fastify: FastifyInstance) => {
 
     const delivery = await prisma.webhookDeliveryLog.create({
       data: {
+        id: `wdl_${nanoid(10)}`,
         webhookId: webhook.id,
         event: "test.ping",
         payload: { ping: true, timestamp: new Date() },

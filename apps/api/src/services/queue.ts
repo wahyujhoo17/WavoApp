@@ -1,6 +1,7 @@
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import crypto from 'crypto';
+import { nanoid } from 'nanoid';
 import { env } from '../config/env.js';
 import { whatsAppServiceManager } from './whatsapp.js';
 import { prisma } from 'database';
@@ -83,6 +84,7 @@ export async function queueMessage(
   // Create initial message log in DB
   const messageLog = await prisma.messageLog.create({
     data: {
+      id: `log_${nanoid(10)}`,
       serviceId,
       direction: 'OUTBOUND',
       messageType: 'TEXT',

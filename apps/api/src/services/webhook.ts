@@ -3,6 +3,7 @@ import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { env } from '../config/env.js';
 import { prisma, DeliveryStatus } from 'database';
+import { nanoid } from 'nanoid';
 
 const connection = new IORedis(env.REDIS_URL, {
   maxRetriesPerRequest: null,
@@ -46,6 +47,7 @@ export const webhookWorker = new Worker(
     // Create a pending delivery log entry
     const deliveryLog = await prisma.webhookDeliveryLog.create({
       data: {
+        id: `wdl_${nanoid(10)}`,
         webhookId: webhookConfigId,
         event,
         payload: JSON.parse(payloadString),
