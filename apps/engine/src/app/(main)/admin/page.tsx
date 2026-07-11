@@ -16,7 +16,12 @@ import {
   Calendar,
   Lock,
   Plus,
-  Trash2
+  Trash2,
+  X,
+  Terminal,
+  Activity,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { useAuth } from '@/components/AuthProvider';
@@ -47,6 +52,14 @@ export default function AdminDashboardPage() {
   const [planFilter, setPlanFilter] = React.useState('ALL');
   const [updatingUserId, setUpdatingUserId] = React.useState<string | null>(null);
   const [updatingConfigKey, setUpdatingConfigKey] = React.useState<string | null>(null);
+
+  // Services & Logs states
+  const [selectedUserForServices, setSelectedUserForServices] = React.useState<any | null>(null);
+  const [selectedServiceForLogs, setSelectedServiceForLogs] = React.useState<any | null>(null);
+  const [serviceLogs, setServiceLogs] = React.useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = React.useState(false);
+  const [logsPagination, setLogsPagination] = React.useState<{ nextCursor: string | null; hasMore: boolean; limit?: number }>({ nextCursor: null, hasMore: false, limit: 15 });
+  const [logsCursorHistory, setLogsCursorHistory] = React.useState<string[]>([]);
 
   // Quick Stats
   const [stats, setStats] = React.useState({
@@ -249,6 +262,38 @@ export default function AdminDashboardPage() {
         }
       }
     });
+  };
+
+  // Handle Fetch Logs
+  const fetchServiceLogs = async (service: any, cursor?: string | null, isBack: boolean = false) => {
+    setSelectedServiceForLogs(service);
+    setLogsLoading(true);
+    const res = await apiFetch<any>(`/admin/services/${service.id}/logs?limit=15${cursor ? `&cursor=${cursor}` : ''}`);
+    if (res.success && res.data) {
+      setServiceLogs(res.data);
+      if (res.pagination) {
+        setLogsPagination(res.pagination);
+        if (cursor && !isBack) {
+          setLogsCursorHistory(prev => [...prev, cursor]);
+        } else if (!cursor) {
+          setLogsCursorHistory([]);
+        } else if (isBack) {
+          setLogsCursorHistory(prev => prev.slice(0, -1));
+        }
+      }
+    } else {
+      toast.error("Fetch Failed", res.error?.message || "Could not load service logs.");
+      setServiceLogs([]);
+    }
+    setLogsLoading(false);
+  };
+
+  // Handle Close Logs Modal
+  const closeLogsModal = () => {
+    setSelectedServiceForLogs(null);
+    setLogsCursorHistory([]);
+    setLogsPagination({ nextCursor: null, hasMore: false, limit: 15 });
+    setServiceLogs([]);
   };
 
   // Handle Dynamic Limits Save
@@ -464,6 +509,14 @@ export default function AdminDashboardPage() {
                                       }`}
                                     >
                                       {updatingUserId === item.id ? '...' : item.isActive ? 'Suspend' : 'Activate'}
+                                    </button>
+
+                                    <button
+                                      onClick={() => setSelectedUserForServices(item)}
+                                      className="p-2 bg-[#cfbcff]/10 hover:bg-[#cfbcff]/20 text-[#cfbcff] border border-[#cfbcff]/20 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                      title="View Services"
+                                    >
+                                      <Smartphone size={14} />
                                     </button>
 
                                     {/* Delete User Button - authorized for SUPER_ADMIN or if the target is a standard USER */}
@@ -717,6 +770,206 @@ export default function AdminDashboardPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </>
+        )}
+
+        {/* User Services Modal */}
+        {selectedUserForServices && !selectedServiceForLogs && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedUserForServices(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-x-4 top-[10%] md:top-[10%] md:left-1/2 md:-translate-x-1/2 md:w-[800px] max-h-[80vh] bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl p-8 z-[110] flex flex-col gap-6"
+            >
+              <div className="flex justify-between items-center shrink-0">
+                <div>
+                  <h3 className="text-[22px] font-bold text-white tracking-tight flex items-center gap-2">
+                    <Smartphone className="text-[#cfbcff]" size={24} />
+                    User Services
+                  </h3>
+                  <p className="text-[13px] text-[#8e8e93] mt-0.5 font-medium">Services owned by {selectedUserForServices.fullName}</p>
+                </div>
+                <button 
+                  onClick={() => setSelectedUserForServices(null)}
+                  className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#8e8e93] hover:text-white transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar -mx-2 px-2">
+                {selectedUserForServices.services?.length === 0 ? (
+                  <div className="py-12 text-center text-[#8e8e93] font-medium bg-black/20 rounded-[24px]">
+                    This user has no active WhatsApp services.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {selectedUserForServices.services.map((svc: any) => (
+                      <div key={svc.id} className="bg-black/30 border border-white/5 rounded-[24px] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-white/10 transition-all">
+                        <div>
+                          <div className="flex items-center gap-3">
+                            <h4 className="text-[16px] font-bold text-white">{svc.name}</h4>
+                            <span className={`px-2 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border ${
+                              svc.status === 'CONNECTED' ? 'bg-[#34C759]/10 text-[#34C759] border-[#34C759]/20' : 
+                              'bg-[#ff3b30]/10 text-[#ff3b30] border-[#ff3b30]/20'
+                            }`}>
+                              {svc.status}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-4 mt-2">
+                            <p className="text-[12px] text-[#8e8e93] font-mono">ID: {svc.id.slice(0, 8)}...</p>
+                            <p className="text-[12px] text-[#8e8e93] font-mono">Phone: {svc.phoneNumber || 'N/A'}</p>
+                            <p className="text-[12px] text-[#8e8e93]">Sent Today: {svc.dailyMessageCount || 0}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => fetchServiceLogs(svc)}
+                          className="px-4 py-2 shrink-0 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl font-bold text-[12px] transition-all flex items-center gap-2"
+                        >
+                          <Terminal size={14} />
+                          View Logs
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+
+        {/* Admin Logs Modal */}
+        {selectedServiceForLogs && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeLogsModal}
+              className="fixed inset-0 bg-black/70 backdrop-blur-md z-[120]"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-x-4 top-[5%] bottom-[5%] md:left-[10%] md:right-[10%] bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl flex flex-col z-[130] overflow-hidden"
+            >
+              <div className="p-6 md:p-8 border-b border-white/[0.05] flex justify-between items-center bg-black/20 shrink-0">
+                <div>
+                  <h3 className="text-[22px] font-bold text-white tracking-tight flex items-center gap-2">
+                    <Terminal className="text-[#34C759]" size={24} />
+                    Service Logs: {selectedServiceForLogs.name}
+                  </h3>
+                  <p className="text-[13px] text-[#8e8e93] mt-0.5 font-medium font-mono">ID: {selectedServiceForLogs.id}</p>
+                </div>
+                <button 
+                  onClick={closeLogsModal}
+                  className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#8e8e93] hover:text-white transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8">
+                {logsLoading ? (
+                  <div className="space-y-4 animate-pulse">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <div key={i} className="h-16 bg-white/5 rounded-2xl w-full" />
+                    ))}
+                  </div>
+                ) : serviceLogs.length === 0 ? (
+                  <div className="py-20 text-center text-[#8e8e93] font-medium bg-black/20 rounded-[24px]">
+                    No logs found for this service.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {serviceLogs.map((log) => (
+                      <div key={log.id} className="bg-black/30 border border-white/5 rounded-[20px] p-5 flex flex-col hover:border-white/10 transition-colors">
+                        {/* Top Row */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider border ${
+                              ['SENT', 'DELIVERED', 'READ'].includes(log.status) ? 'bg-[#34C759]/10 text-[#34C759] border-[#34C759]/20' : 
+                              log.status === 'FAILED' ? 'bg-[#ff3b30]/10 text-[#ff3b30] border-[#ff3b30]/20' :
+                              'bg-[#FFCC00]/10 text-[#FFCC00] border-[#FFCC00]/20'
+                            }`}>
+                              {log.status}
+                            </span>
+                            <span className={`text-[10px] font-bold font-mono px-2 py-1 rounded-md bg-white/5 ${log.direction === 'OUTBOUND' ? 'text-[#cfbcff]' : 'text-[#00c896]'}`}>
+                              {log.direction}
+                            </span>
+                            {log.messageType && (
+                              <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-white/5 text-[#8e8e93] capitalize">
+                                {log.messageType.toLowerCase()}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#8e8e93]">{new Date(log.createdAt || log.sentAt).toLocaleString()}</p>
+                        </div>
+                        
+                        {/* Content Row */}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex justify-between items-center">
+                            <p className="text-[13px] text-[#8e8e93] font-mono">
+                              {log.direction === 'OUTBOUND' ? `To: ${log.toNumber}` : `From: ${log.fromNumber || 'N/A'}`}
+                            </p>
+                            <p className="text-[11px] text-[#555] font-mono" title={log.id}>{log.id.slice(0, 8)}...</p>
+                          </div>
+                          
+                          {log.payload && typeof log.payload === 'object' && (
+                            <div className="mt-1 bg-black/40 rounded-xl p-3 border border-white/5 text-[12px] text-white/80 font-mono break-words max-h-[100px] overflow-y-auto custom-scrollbar">
+                              {log.payload.text || log.payload.caption || JSON.stringify(log.payload)}
+                            </div>
+                          )}
+                          
+                          {log.errorMessage && (
+                            <div className="mt-1 text-[12px] text-[#ff3b30] bg-[#ff3b30]/10 px-3 py-2 rounded-xl border border-[#ff3b30]/20">
+                              {log.errorMessage}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Pagination Controls */}
+              {!logsLoading && serviceLogs.length > 0 && (
+                <div className="p-4 border-t border-white/[0.05] flex items-center justify-between bg-black/20 shrink-0">
+                  <button
+                    disabled={logsCursorHistory.length === 0}
+                    onClick={() => {
+                      const prevCursor = logsCursorHistory.length > 1 ? logsCursorHistory[logsCursorHistory.length - 2] : null;
+                      fetchServiceLogs(selectedServiceForLogs, prevCursor, true);
+                    }}
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:hover:bg-white/5 text-white border border-white/10 rounded-xl font-bold text-[12px] transition-all flex items-center gap-2"
+                  >
+                    <ChevronLeft size={16} />
+                    Previous
+                  </button>
+                  <span className="text-[12px] text-[#8e8e93] font-mono font-medium">
+                    Page {logsCursorHistory.length + 1}
+                  </span>
+                  <button
+                    disabled={!logsPagination.hasMore}
+                    onClick={() => fetchServiceLogs(selectedServiceForLogs, logsPagination.nextCursor)}
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:hover:bg-white/5 text-white border border-white/10 rounded-xl font-bold text-[12px] transition-all flex items-center gap-2"
+                  >
+                    Next
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
             </motion.div>
           </>
         )}

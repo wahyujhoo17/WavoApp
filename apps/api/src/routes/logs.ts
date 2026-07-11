@@ -71,7 +71,7 @@ export const logsRoutes: FastPluginAsync = async (fastify: FastifyInstance) => {
       take: limit,
       skip,
       cursor: cursorObj,
-      orderBy: { id: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     });
 
     const hasMore = logs.length === limit;

@@ -11,39 +11,49 @@ function CallbackContent() {
   const { setUser } = useAuth();
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const refresh = searchParams.get('refresh');
-    const userStr = searchParams.get('user');
+    const code = searchParams.get('code');
+    const error = searchParams.get('error');
 
-    if (token && refresh && userStr) {
-      try {
-        const user = JSON.parse(decodeURIComponent(userStr));
-        
-        // Establish local auth state
-        setTokens(token, refresh);
-        localStorage.setItem('wavo_user', JSON.stringify(user));
-        setUser(user);
-        
-        toast.success("Authentication Successful", `Welcome, ${user.fullName}!`);
-        router.push('/dashboard');
-      } catch (err) {
-        console.error("Failed to parse OAuth user metadata", err);
-        toast.error("Authentication Failed", "Received invalid user metadata from identity provider.");
-        router.push('/login?error=invalid_user_data');
-      }
-    } else {
-      const error = searchParams.get('error') || 'unknown_error';
+    if (error) {
       console.error("OAuth authentication failed", error);
-      
       let friendlyError = "Authentication was rejected or configuration is missing.";
-      if (error === 'google_not_configured') {
-        friendlyError = "Google Login is not configured on the server.";
-      } else if (error === 'github_not_configured') {
-        friendlyError = "GitHub Login is not configured on the server.";
-      }
+      if (error === 'google_not_configured') friendlyError = "Google Login is not configured.";
+      if (error === 'github_not_configured') friendlyError = "GitHub Login is not configured.";
+      if (error === 'csrf_validation_failed') friendlyError = "Security validation failed. Please try again.";
       
       toast.error("Authentication Failed", friendlyError);
       router.push(`/login?error=${error}`);
+      return;
+    }
+
+    if (code) {
+      // Exchange code for tokens
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/auth/oauth/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          const { user, accessToken, refreshToken } = data.data;
+          setTokens(accessToken, refreshToken);
+          localStorage.setItem('wavo_user', JSON.stringify(user));
+          setUser(user);
+          
+          toast.success("Authentication Successful", `Welcome, ${user.fullName}!`);
+          router.push('/dashboard');
+        } else {
+          throw new Error(data.error?.message || 'Exchange failed');
+        }
+      })
+      .catch(err => {
+        console.error("Failed to exchange OAuth token", err);
+        toast.error("Authentication Failed", "Received invalid response from server.");
+        router.push('/login?error=exchange_failed');
+      });
+    } else {
+      router.push('/login');
     }
   }, [searchParams, router, setUser]);
 

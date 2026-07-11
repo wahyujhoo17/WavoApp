@@ -26,7 +26,7 @@ import {
   Send,
   Loader2
 } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getAccessToken } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { io } from 'socket.io-client';
 import { useConfirmation } from '@/components/ConfirmationProvider';
@@ -168,7 +168,9 @@ export default function ServiceDetailPage({ params }: { params: Promise<{ id: st
     const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000';
     console.log(`[Socket] Connecting to ${SOCKET_URL} for room service:${id}`);
     
-    const socket = io(SOCKET_URL);
+    const socket = io(SOCKET_URL, {
+      auth: { token: getAccessToken() }
+    });
     
     socket.on('connect', () => {
       console.log(`[Socket] Connected, subscribing to room service:${id}`);

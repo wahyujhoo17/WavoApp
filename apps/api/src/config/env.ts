@@ -24,7 +24,7 @@ const envSchema = z.object({
   // AES 256 GCM encryption key for WhatsApp sessions (must be 32 bytes/characters)
   ENCRYPTION_KEY: z.string().min(32, {
     message: 'ENCRYPTION_KEY must be at least 32 characters long for AES-256-GCM encryption',
-  }).default('wavo_secure_session_encryption_key_32_bytes_long_secret'),
+  }),
   
   // Storage settings
   MINIO_ENDPOINT: z.string().default('localhost'),

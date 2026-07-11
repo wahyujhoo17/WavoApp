@@ -3,6 +3,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/a
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
+  pagination?: {
+    hasMore: boolean;
+    nextCursor: string | null;
+    limit?: number;
+  };
   error?: {
     code: string;
     message: string;
@@ -19,6 +24,10 @@ export const getAccessToken = (): string | null => {
   if (typeof window === 'undefined') return null;
   if (!cachedAccessToken) {
     cachedAccessToken = localStorage.getItem('wavo_access_token');
+    // Sync to cookie if missing (for seamless migration to middleware)
+    if (cachedAccessToken && !document.cookie.includes('wavo_access_token=')) {
+      document.cookie = `wavo_access_token=${cachedAccessToken}; path=/; max-age=86400; SameSite=Lax`;
+    }
   }
   return cachedAccessToken;
 };
@@ -37,6 +46,8 @@ export const setTokens = (accessToken: string, refreshToken: string) => {
   cachedRefreshToken = refreshToken;
   localStorage.setItem('wavo_access_token', accessToken);
   localStorage.setItem('wavo_refresh_token', refreshToken);
+  // Set cookie for Next.js middleware to read
+  document.cookie = `wavo_access_token=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
 };
 
 export const clearTokens = () => {
@@ -46,6 +57,8 @@ export const clearTokens = () => {
   localStorage.removeItem('wavo_access_token');
   localStorage.removeItem('wavo_refresh_token');
   localStorage.removeItem('wavo_user');
+  // Clear cookie
+  document.cookie = `wavo_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 };
 
 let isRefreshing = false;

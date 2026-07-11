@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { 
@@ -12,10 +13,11 @@ import {
   RefreshCw,
   LogOut,
   Eye,
-  Edit3
+  Edit3,
+  X
 } from 'lucide-react';
 import { io } from 'socket.io-client';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getAccessToken } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { useConfirmation } from '@/components/ConfirmationProvider';
 
@@ -48,7 +50,7 @@ const ServiceCard = ({
 }: { 
   service: WhatsAppService; 
   onDelete: () => void; 
-  onUpdate: (updated: WhatsAppService) => void; 
+  onUpdate: (id: string, updates: Partial<WhatsAppService>) => void; 
 }) => {
   const { id, name, status, phoneNumber } = service;
   const router = useRouter();
@@ -56,9 +58,15 @@ const ServiceCard = ({
   const [showDropdown, setShowDropdown] = React.useState(false);
   const [isConnecting, setIsConnecting] = React.useState(false);
   const [qrCode, setQrCode] = React.useState<string | null>(null);
+  const [showQrModal, setShowQrModal] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
   const [localStatus, setLocalStatus] = React.useState(status);
   const [localPhoneNumber, setLocalPhoneNumber] = React.useState(phoneNumber);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Sync status and phone number props if they change externally
   React.useEffect(() => {
@@ -66,17 +74,14 @@ const ServiceCard = ({
     setLocalPhoneNumber(phoneNumber);
   }, [status, phoneNumber]);
   
-  // Connect to Socket.IO for QR and Status stream if status is CONNECTING or QR_PENDING
+  // Connect to Socket.IO for QR and Status stream
   React.useEffect(() => {
-    if (localStatus !== 'CONNECTING' && localStatus !== 'QR_PENDING') {
-      setQrCode(null);
-      return;
-    }
-    
     const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000';
     console.log(`[Socket] Connecting to ${SOCKET_URL} for room service:${id}`);
     
-    const socket = io(SOCKET_URL);
+    const socket = io(SOCKET_URL, {
+      auth: { token: getAccessToken() }
+    });
     
     socket.on('connect', () => {
       console.log(`[Socket] Connected, subscribing to room service:${id}`);
@@ -87,7 +92,8 @@ const ServiceCard = ({
       console.log(`[Socket] Received QR code for service:${id}`);
       setQrCode(data.qr);
       setLocalStatus('QR_PENDING');
-      onUpdate({ ...service, status: 'QR_PENDING' });
+      setShowQrModal(true);
+      onUpdate(id, { status: 'QR_PENDING' });
     });
     
     socket.on('service:status', (data: { serviceId: string; status: any; phoneNumber?: string }) => {
@@ -96,18 +102,19 @@ const ServiceCard = ({
       if (data.phoneNumber) {
         setLocalPhoneNumber(data.phoneNumber);
       }
-      onUpdate({ 
-        ...service, 
+      onUpdate(id, { 
         status: data.status, 
-        phoneNumber: data.phoneNumber || service.phoneNumber 
+        ...(data.phoneNumber && { phoneNumber: data.phoneNumber })
       });
       
       if (data.status === 'CONNECTED') {
         toast.success("WhatsApp Connected", `Successfully paired device with number ${data.phoneNumber || ''}!`);
         setQrCode(null);
+        setShowQrModal(false);
       } else if (data.status === 'DISCONNECTED' || data.status === 'INACTIVE') {
         toast.info("WhatsApp Disconnected", "The WhatsApp instance is now disconnected.");
         setQrCode(null);
+        setShowQrModal(false);
       }
     });
     
@@ -115,7 +122,7 @@ const ServiceCard = ({
       console.log(`[Socket] Disconnecting socket for service:${id}`);
       socket.disconnect();
     };
-  }, [id, localStatus]);
+  }, [id, onUpdate]);
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -146,7 +153,10 @@ const ServiceCard = ({
       if (res.data?.qr) {
         setQrCode(res.data.qr);
         setLocalStatus('QR_PENDING');
-        onUpdate({ ...service, status: 'QR_PENDING' });
+        setShowQrModal(true);
+        onUpdate(id, { status: 'QR_PENDING' });
+      } else {
+        onUpdate(id, { status: 'CONNECTING' });
       }
     } else {
       toast.error("Failed to Connect", res.error?.message || "Could not connect to WhatsApp service.");
@@ -164,8 +174,9 @@ const ServiceCard = ({
     if (res.success) {
       setLocalStatus('INACTIVE');
       setQrCode(null);
+      setShowQrModal(false);
       setLocalPhoneNumber(null);
-      onUpdate({ ...service, status: 'INACTIVE', phoneNumber: null });
+      onUpdate(id, { status: 'INACTIVE', phoneNumber: null });
       toast.success("Disconnected", "WhatsApp session gracefully disconnected.");
     } else {
       toast.error("Disconnection Failed", res.error?.message || "Failed to disconnect WhatsApp service.");
@@ -277,17 +288,18 @@ const ServiceCard = ({
         </div>
 
         {localStatus === 'QR_PENDING' && qrCode ? (
-          <div className="flex items-center gap-4 bg-black/40 p-3 rounded-xl border border-white/5">
-            <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
-               <img 
-                 src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCode)}`}
-                 alt="Scan QR" 
-                 className="w-full h-full object-contain"
-               />
+          <div className="flex flex-col gap-3 p-4 rounded-xl border border-[#FFCC00]/20 bg-[#FFCC00]/5 items-center justify-center text-center">
+            <QrCode size={24} className="text-[#FFCC00]" />
+            <div>
+              <p className="text-[13px] text-[#FFCC00] font-bold">QR Code Ready</p>
+              <p className="text-[11px] text-[#8e8e93] mt-1">Please scan the QR code to connect.</p>
             </div>
-            <p className="text-[12px] text-[#8e8e93] font-medium leading-relaxed">
-              Scan with WhatsApp to link device.
-            </p>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowQrModal(true); }}
+              className="mt-2 py-2 px-6 rounded-lg font-bold text-[12px] bg-[#FFCC00] text-black hover:opacity-90 transition-all w-full"
+            >
+              View QR Code
+            </button>
           </div>
         ) : localStatus === 'CONNECTING' || isConnecting ? (
           <div className="flex items-center gap-4 bg-black/40 p-3 rounded-xl border border-white/5 justify-center py-4">
@@ -336,6 +348,69 @@ const ServiceCard = ({
           </button>
         )}
       </div>
+
+      {/* QR Code Modal */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {showQrModal && qrCode && (
+            <div 
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto"
+              onClick={(e) => { e.stopPropagation(); setShowQrModal(false); }}
+            >
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
+              >
+              <button 
+                onClick={(e) => { e.stopPropagation(); setShowQrModal(false); }}
+                className="absolute right-6 top-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-[#8e8e93] hover:text-white transition-all z-20"
+              >
+                <X size={18} />
+              </button>
+              
+              <div className="space-y-2 relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-[#FFCC00]/10 border border-[#FFCC00]/20 flex items-center justify-center text-[#FFCC00]">
+                  <QrCode size={24} />
+                </div>
+                <h3 className="text-[22px] font-bold text-white tracking-tight pt-1">Scan QR Code</h3>
+                <p className="text-[14px] text-[#8e8e93] leading-relaxed">
+                  Open WhatsApp on your phone, go to <strong>Linked Devices</strong>, and point your camera at this QR code.
+                </p>
+              </div>
+                
+              <div className="flex justify-center w-full py-2">
+                <div className="w-[280px] h-[280px] bg-white rounded-3xl flex items-center justify-center p-4 shadow-[0_0_40px_rgba(255,204,0,0.15)] relative overflow-hidden">
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCode)}`}
+                    alt="Scan QR" 
+                    className="w-full h-full object-contain relative z-10"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-4 pt-2">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setShowQrModal(false); }}
+                  className="flex-1 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-bold text-[15px] transition-all active:scale-[0.98]"
+                >
+                  Close Window
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleDisconnect(e); }}
+                  className="flex-1 py-4 bg-[#FF3B30]/10 text-[#FF3B30] border border-[#FF3B30]/20 rounded-2xl font-bold text-[15px] hover:bg-[#FF3B30]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Cancel Connection
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
@@ -407,8 +482,8 @@ export default function WhatsAppServicesPage() {
     }
   };
 
-  const handleCardUpdate = (updatedService: WhatsAppService) => {
-    setServices(prev => prev.map(s => s.id === updatedService.id ? updatedService : s));
+  const handleCardUpdate = (id: string, updates: Partial<WhatsAppService>) => {
+    setServices(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   };
 
   const handleCardDelete = (id: string) => {

@@ -26,11 +26,12 @@ import {
   Activity,
   Crown,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Terminal
 } from 'lucide-react';
 
 import { io, Socket } from 'socket.io-client';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getAccessToken } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { toast } from '@/lib/toast';
 
@@ -176,8 +177,14 @@ export default function DashboardLayout({
 
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   const [services, setServices] = React.useState<any[]>([]);
+  const servicesRef = React.useRef<any[]>([]);
   const socketRef = React.useRef<Socket | null>(null);
   const subscribedRoomsRef = React.useRef<Set<string>>(new Set());
+
+  // Keep servicesRef updated
+  React.useEffect(() => {
+    servicesRef.current = services;
+  }, [services]);
 
   // Load notifications from localStorage
   React.useEffect(() => {
@@ -225,7 +232,9 @@ export default function DashboardLayout({
 
     const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000';
     console.log(`[Notification Socket] Connecting to ${SOCKET_URL}`);
-    const socket = io(SOCKET_URL);
+    const socket = io(SOCKET_URL, {
+      auth: { token: getAccessToken() }
+    });
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -243,92 +252,85 @@ export default function DashboardLayout({
     socket.on('service:status', (data: { serviceId: string; status: string; phoneNumber?: string }) => {
       console.log('[Notification Socket] Received service status update:', data);
       
-      // We look up the service name at render/handling time
-      setServices((currentServices) => {
-        const service = currentServices.find((s) => s.id === data.serviceId);
-        const serviceName = service ? service.name : 'WhatsApp Service';
+      const currentServices = servicesRef.current;
+      const service = currentServices.find((s) => s.id === data.serviceId);
+      const serviceName = service ? service.name : 'WhatsApp Service';
 
-        let title = 'Service Update';
-        let desc = `Service "${serviceName}" status is now ${data.status}`;
-        let type: 'info' | 'success' | 'error' | 'warning' = 'info';
-        let iconName: 'WhatsAppIcon' | 'Webhook' | 'CheckCircle2' | 'AlertCircle' | 'Smartphone' = 'Smartphone';
+      let title = 'Service Update';
+      let desc = `Service "${serviceName}" status is now ${data.status}`;
+      let type: 'info' | 'success' | 'error' | 'warning' = 'info';
+      let iconName: 'WhatsAppIcon' | 'Webhook' | 'CheckCircle2' | 'AlertCircle' | 'Smartphone' = 'Smartphone';
 
-        switch (data.status) {
-          case 'CONNECTED':
-            title = 'Service Connected';
-            desc = `Service "${serviceName}" is now active and ready${data.phoneNumber ? ` with number +${data.phoneNumber}` : ''}`;
-            type = 'success';
-            iconName = 'CheckCircle2';
-            break;
-          case 'DISCONNECTED':
-            title = 'Service Disconnected';
-            desc = `Service "${serviceName}" has disconnected`;
-            type = 'error';
-            iconName = 'AlertCircle';
-            break;
-          case 'CONNECTING':
-            title = 'Service Connecting';
-            desc = `Service "${serviceName}" is establishing connection...`;
-            type = 'info';
-            iconName = 'Smartphone';
-            break;
-          case 'QR_PENDING':
-            title = 'Scan QR Code';
-            desc = `Service "${serviceName}" generated a new QR Code. Scan to connect.`;
-            type = 'info';
-            iconName = 'Smartphone';
-            break;
-          case 'SUSPENDED':
-            title = 'Service Suspended';
-            desc = `Service "${serviceName}" has been suspended`;
-            type = 'error';
-            iconName = 'AlertCircle';
-            break;
-        }
+      switch (data.status) {
+        case 'CONNECTED':
+          title = 'Service Connected';
+          desc = `Service "${serviceName}" is now active and ready${data.phoneNumber ? ` with number +${data.phoneNumber}` : ''}`;
+          type = 'success';
+          iconName = 'CheckCircle2';
+          break;
+        case 'DISCONNECTED':
+          title = 'Service Disconnected';
+          desc = `Service "${serviceName}" has disconnected`;
+          type = 'error';
+          iconName = 'AlertCircle';
+          break;
+        case 'CONNECTING':
+          title = 'Service Connecting';
+          desc = `Service "${serviceName}" is establishing connection...`;
+          type = 'info';
+          iconName = 'Smartphone';
+          break;
+        case 'QR_PENDING':
+          title = 'Scan QR Code';
+          desc = `Service "${serviceName}" generated a new QR Code. Scan to connect.`;
+          type = 'info';
+          iconName = 'Smartphone';
+          break;
+        case 'SUSPENDED':
+          title = 'Service Suspended';
+          desc = `Service "${serviceName}" has been suspended`;
+          type = 'error';
+          iconName = 'AlertCircle';
+          break;
+      }
 
-        const newNotif: NotificationItem = {
-          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
-          title,
-          desc,
-          timestamp: new Date().toISOString(),
-          type,
-          read: false,
-          iconName,
-        };
+      const newNotif: NotificationItem = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+        title,
+        desc,
+        timestamp: new Date().toISOString(),
+        type,
+        read: false,
+        iconName,
+      };
 
-        setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
-        toast.show(
-          newNotif.title,
-          newNotif.desc,
-          newNotif.type === 'warning' ? 'info' : (newNotif.type as any)
-        );
-
-        return currentServices;
-      });
+      setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
+      toast.show(
+        newNotif.title,
+        newNotif.desc,
+        newNotif.type === 'warning' ? 'info' : (newNotif.type as any)
+      );
     });
 
     socket.on('service:message', (data: { serviceId: string; from: string; message: string; type: string; timestamp: string }) => {
       console.log('[Notification Socket] Received service message update:', data);
 
-      setServices((currentServices) => {
-        const service = currentServices.find((s) => s.id === data.serviceId);
-        const serviceName = service ? service.name : 'WhatsApp Service';
+      const currentServices = servicesRef.current;
+      const service = currentServices.find((s) => s.id === data.serviceId);
+      const serviceName = service ? service.name : 'WhatsApp Service';
 
-        const newNotif: NotificationItem = {
-          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
-          title: 'New Message Received',
-          desc: `New message from +${data.from} on service "${serviceName}": ${data.message.slice(0, 60)}${data.message.length > 60 ? '...' : ''}`,
-          timestamp: new Date().toISOString(),
-          type: 'info',
-          read: false,
-          iconName: 'WhatsAppIcon',
-        };
+      const newNotif: NotificationItem = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+        title: 'New Message Received',
+        desc: `New message from +${data.from} on service "${serviceName}": ${data.message.slice(0, 60)}${data.message.length > 60 ? '...' : ''}`,
+        timestamp: new Date().toISOString(),
+        type: 'info',
+        read: false,
+        iconName: 'WhatsAppIcon',
+      };
 
-        setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
-        toast.info(newNotif.title, newNotif.desc);
-
-        return currentServices;
-      });
+      setNotifications((prev) => [newNotif, ...prev].slice(0, 50));
+      toast.info(newNotif.title, newNotif.desc);
     });
 
     return () => {
@@ -429,6 +431,7 @@ export default function DashboardLayout({
           <SidebarLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" active={pathname === '/dashboard'} minimized={isMinimized} />
           <SidebarLink href="/whatsapp-services" icon={WhatsAppIcon} label="WhatsApp Services" active={pathname.startsWith('/whatsapp-services')} minimized={isMinimized} />
           <SidebarLink href="/webhooks" icon={Webhook} label="Webhooks" active={pathname === '/webhooks'} minimized={isMinimized} />
+          <SidebarLink href="/playground" icon={Terminal} label="API Playground" active={pathname === '/playground'} minimized={isMinimized} />
           <SidebarLink href="/logs" icon={ClipboardList} label="Logs" active={pathname === '/logs'} minimized={isMinimized} />
           <SidebarLink href="/docs" icon={FileText} label="Documentation" active={pathname === '/docs'} minimized={isMinimized} />
           <SidebarLink href="/settings" icon={Settings} label="Settings" active={pathname === '/settings'} minimized={isMinimized} />
@@ -500,6 +503,15 @@ export default function DashboardLayout({
                 </div>
               )}
             </button>
+            {!isMinimized ? (
+              <div className="px-2 pt-4 pb-2">
+                <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wider bg-white/5 px-2 py-1 rounded-md border border-white/10">v2.1 Beta</span>
+              </div>
+            ) : (
+              <div className="flex justify-center pt-4 pb-2">
+                <span className="text-[9px] font-bold text-[#8e8e93] bg-white/5 px-1.5 py-0.5 rounded border border-white/10">v2</span>
+              </div>
+            )}
           </div>
         </div>
       </motion.aside>

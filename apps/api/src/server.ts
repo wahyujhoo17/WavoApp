@@ -1,5 +1,6 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
@@ -42,8 +43,25 @@ export async function createServer(): Promise<FastifyInstanceWithIO> {
 
   // Enable CORS
   await fastify.register(cors, {
-    origin: '*',
+    origin: env.FRONTEND_URL,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
+  // Security Headers
+  await fastify.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameguard: {
+      action: 'deny',
+    },
   });
 
   // Setup Rate Limiting with Redis
@@ -226,7 +244,7 @@ export async function createServer(): Promise<FastifyInstanceWithIO> {
   // Initialize Socket.IO
   const io = new SocketServer(fastify.server as http.Server, {
     cors: {
-      origin: '*',
+      origin: env.FRONTEND_URL,
       methods: ['GET', 'POST'],
     },
   });
@@ -234,19 +252,61 @@ export async function createServer(): Promise<FastifyInstanceWithIO> {
   // Set manager instance to use this Socket.IO server
   whatsAppServiceManager.setSocketIO(io);
 
-  io.on('connection', (socket) => {
-    fastify.log.info(`Socket connected: ${socket.id}`);
+  // Socket.IO Authentication Middleware
+  io.use((socket, next) => {
+    try {
+      const auth = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
+      if (!auth) {
+        return next(new Error('Authentication error: Missing token'));
+      }
+      
+      const decoded = fastify.jwt.verify(auth);
+      socket.data.user = decoded;
+      next();
+    } catch (err) {
+      next(new Error('Authentication error: Invalid or expired token'));
+    }
+  });
 
-    socket.on('subscribe', ({ serviceId }) => {
-      if (serviceId) {
-        socket.join(`service:${serviceId}`);
-        fastify.log.info(`Socket ${socket.id} subscribed to service:${serviceId}`);
+  io.on('connection', (socket) => {
+    fastify.log.info(`Socket connected: ${socket.id} (User: ${socket.data.user?.sub})`);
+
+    socket.on('subscribe', async ({ serviceId }) => {
+      if (serviceId && socket.data.user?.sub) {
+        try {
+          const service = await prisma.whatsAppService.findUnique({
+            where: { id: serviceId }
+          });
+          
+          if (service && service.userId === socket.data.user.sub) {
+            socket.join(`service:${serviceId}`);
+            fastify.log.info(`Socket ${socket.id} subscribed to service:${serviceId}`);
+          } else {
+            fastify.log.warn(`Socket ${socket.id} unauthorized attempt to subscribe to service:${serviceId}`);
+          }
+        } catch (e) {
+          fastify.log.error(e);
+        }
       }
     });
 
-    socket.on('subscribe:admin', () => {
-      socket.join('admin');
-      fastify.log.info(`Socket ${socket.id} subscribed to admin room`);
+    socket.on('subscribe:admin', async () => {
+      if (socket.data.user?.sub) {
+        try {
+          const user = await prisma.user.findUnique({
+            where: { id: socket.data.user.sub }
+          });
+          
+          if (user && user.role === 'SUPER_ADMIN') {
+            socket.join('admin');
+            fastify.log.info(`Socket ${socket.id} subscribed to admin room`);
+          } else {
+            fastify.log.warn(`Socket ${socket.id} unauthorized attempt to subscribe to admin room`);
+          }
+        } catch (e) {
+          fastify.log.error(e);
+        }
+      }
     });
 
     socket.on('disconnect', () => {

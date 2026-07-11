@@ -5,6 +5,7 @@ import { prisma, UserRole, UserPlan } from 'database';
 import crypto from 'crypto';
 import { env } from '../config/env.js';
 import { generateSecret, verifyTOTP, getOTPAuthURI, generateQRCodeDataURI } from '../lib/totp.js';
+import { sendResetPasswordEmail } from '../services/mailer.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -46,6 +47,15 @@ const enable2faSchema = z.object({
 
 const disable2faSchema = z.object({
   password: z.string(),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string(),
+  newPassword: z.string().min(8),
 });
 
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -193,22 +203,15 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const { email, password } = parse.data;
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
+    
+    // To prevent user enumeration, we do a dummy hash comparison if user is not found
+    if (!user || !user.passwordHash) {
+      await bcrypt.compare(password, '$2a$12$dummyhashdummyhashdummyhashdummyhashdummyhash'); // dummy hash
       return reply.status(401).send({
         success: false,
         error: {
-          code: 'EMAIL_NOT_FOUND',
-          message: 'Email address is not registered.'
-        }
-      });
-    }
-
-    if (!user.passwordHash) {
-      return reply.status(401).send({
-        success: false,
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'This account does not have an active password.'
+          code: 'INVALID_CREDENTIALS',
+          message: 'The email or password you entered is incorrect.'
         }
       });
     }
@@ -228,8 +231,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(401).send({
         success: false,
         error: {
-          code: 'INVALID_PASSWORD',
-          message: 'The password you entered is incorrect.'
+          code: 'INVALID_CREDENTIALS',
+          message: 'The email or password you entered is incorrect.'
         }
       });
     }
@@ -578,6 +581,119 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     });
   });
 
+  // POST /auth/forgot-password
+  fastify.post('/forgot-password', {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '1 hour',
+        errorResponseBuilder: (request, context) => ({
+          success: false,
+          error: {
+            code: 'TOO_MANY_REQUESTS',
+            message: `Too many requests. Please try again in ${context.after}.`
+          }
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const parse = forgotPasswordSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid parameters',
+          details: parse.error.format()
+        }
+      });
+    }
+
+    const { email } = parse.data;
+    const user = await prisma.user.findUnique({ where: { email } });
+    
+    // Always return success to prevent user enumeration
+    if (!user || !user.isActive) {
+      return reply.status(200).send({
+        success: true,
+        data: { message: 'If that email is registered, we have sent a reset link.' }
+      });
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetPasswordToken: token,
+        resetPasswordExpires: expires
+      }
+    });
+
+    const resetLink = `${env.FRONTEND_URL}/reset-password?token=${token}`;
+    
+    // Send email
+    fastify.log.info(`[Forgot Password] Sending reset link for ${email}: ${resetLink}`);
+    await sendResetPasswordEmail(email, resetLink);
+
+    return reply.status(200).send({
+      success: true,
+      data: { message: 'If that email is registered, we have sent a reset link.' }
+    });
+  });
+
+  // POST /auth/reset-password
+  fastify.post('/reset-password', async (request, reply) => {
+    const parse = resetPasswordSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid parameters',
+          details: parse.error.format()
+        }
+      });
+    }
+
+    const { token, newPassword } = parse.data;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: { gt: new Date() }
+      }
+    });
+
+    if (!user) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'INVALID_TOKEN',
+          message: 'Password reset token is invalid or has expired.'
+        }
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        resetPasswordToken: null,
+        resetPasswordExpires: null
+      }
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: { message: 'Password has been reset successfully.' }
+    });
+  });
+
   // GET /api/v1/auth/usage (Authenticated)
   fastify.get('/usage', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
     const userId = request.user.sub;
@@ -641,17 +757,31 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     if (!env.GOOGLE_CLIENT_ID) {
       return reply.redirect(`${env.FRONTEND_URL}/login?error=google_not_configured`);
     }
+    const state = crypto.randomBytes(16).toString('hex');
+    reply.header('Set-Cookie', `oauth_state=${state}; HttpOnly; Path=/; Max-Age=300; SameSite=Lax`);
+    
     const redirectUri = `${env.API_URL}/api/v1/auth/google/callback`;
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20email`;
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20email&state=${state}`;
     return reply.redirect(googleAuthUrl);
   });
 
   // GET /auth/google/callback
   fastify.get('/google/callback', async (request: any, reply) => {
-    const { code } = request.query;
+    const { code, state } = request.query;
     if (!code) {
       return reply.redirect(`${env.FRONTEND_URL}/login?error=code_missing`);
     }
+
+    const cookieHeader = request.headers.cookie || '';
+    const match = cookieHeader.match(/oauth_state=([^;]+)/);
+    const storedState = match ? match[1] : null;
+
+    if (!state || !storedState || state !== storedState) {
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=csrf_validation_failed`);
+    }
+
+    // Clear cookie
+    reply.header('Set-Cookie', `oauth_state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`);
 
     try {
       const redirectUri = `${env.API_URL}/api/v1/auth/google/callback`;
@@ -732,44 +862,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         });
       }
 
-      // Generate tokens
-      const clientAccessToken = fastify.jwt.sign({
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        plan: user.plan
-      });
-
-      const tokenFamily = crypto.randomUUID();
-      const clientRefreshToken = fastify.jwt.sign({
-        sub: user.id,
-        tokenFamily
-      }, { expiresIn: '7d' });
-
-      const hashedRefreshToken = crypto.createHash('sha256').update(clientRefreshToken).digest('hex');
-
-      await prisma.session.create({
-        data: {
-          userId: user.id,
-          refreshTokenHash: hashedRefreshToken,
-          tokenFamily,
-          userAgent: request.headers['user-agent'] || null,
-          ipAddress: request.ip,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        }
-      });
-
-      const frontendUser = {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-        plan: user.plan
-      };
-
-      return reply.redirect(
-        `${env.FRONTEND_URL}/login/callback?token=${clientAccessToken}&refresh=${clientRefreshToken}&user=${encodeURIComponent(JSON.stringify(frontendUser))}`
+      // Generate temporary exchange token (valid for 1 minute)
+      const exchangeToken = fastify.jwt.sign(
+        { sub: user.id, purpose: 'oauth_exchange' },
+        { expiresIn: '1m' }
       );
+
+      return reply.redirect(`${env.FRONTEND_URL}/login/callback?code=${exchangeToken}`);
 
     } catch (err: any) {
       fastify.log.error(err);
@@ -782,17 +881,31 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     if (!env.GITHUB_CLIENT_ID) {
       return reply.redirect(`${env.FRONTEND_URL}/login?error=github_not_configured`);
     }
+    const state = crypto.randomBytes(16).toString('hex');
+    reply.header('Set-Cookie', `oauth_state=${state}; HttpOnly; Path=/; Max-Age=300; SameSite=Lax`);
+    
     const redirectUri = `${env.API_URL}/api/v1/auth/github/callback`;
-    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
+    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email&state=${state}`;
     return reply.redirect(githubAuthUrl);
   });
 
   // GET /auth/github/callback
   fastify.get('/github/callback', async (request: any, reply) => {
-    const { code } = request.query;
+    const { code, state } = request.query;
     if (!code) {
       return reply.redirect(`${env.FRONTEND_URL}/login?error=code_missing`);
     }
+
+    const cookieHeader = request.headers.cookie || '';
+    const match = cookieHeader.match(/oauth_state=([^;]+)/);
+    const storedState = match ? match[1] : null;
+
+    if (!state || !storedState || state !== storedState) {
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=csrf_validation_failed`);
+    }
+
+    // Clear cookie
+    reply.header('Set-Cookie', `oauth_state=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`);
 
     try {
       // Exchange code for token
@@ -895,6 +1008,36 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         });
       }
 
+      // Generate temporary exchange token (valid for 1 minute)
+      const exchangeToken = fastify.jwt.sign(
+        { sub: user.id, purpose: 'oauth_exchange' },
+        { expiresIn: '1m' }
+      );
+
+      return reply.redirect(`${env.FRONTEND_URL}/login/callback?code=${exchangeToken}`);
+
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=internal_server_error`);
+    }
+  });
+
+  // POST /auth/oauth/exchange
+  fastify.post('/oauth/exchange', async (request: any, reply) => {
+    const { code } = request.body;
+    if (!code) return reply.status(400).send({ success: false, error: { message: 'Code is required' } });
+
+    try {
+      const decoded = fastify.jwt.verify(code) as any;
+      if (decoded.purpose !== 'oauth_exchange') {
+        throw new Error('Invalid purpose');
+      }
+
+      const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
+      if (!user || !user.isActive) {
+        return reply.status(401).send({ success: false, error: { message: 'Invalid or suspended user' } });
+      }
+
       // Generate tokens
       const clientAccessToken = fastify.jwt.sign({
         sub: user.id,
@@ -922,26 +1065,41 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         }
       });
 
-      const frontendUser = {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-        plan: user.plan
-      };
-
-      return reply.redirect(
-        `${env.FRONTEND_URL}/login/callback?token=${clientAccessToken}&refresh=${clientRefreshToken}&user=${encodeURIComponent(JSON.stringify(frontendUser))}`
-      );
-
-    } catch (err: any) {
-      fastify.log.error(err);
-      return reply.redirect(`${env.FRONTEND_URL}/login?error=internal_server_error`);
+      return reply.send({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            fullName: user.fullName,
+            role: user.role,
+            plan: user.plan
+          },
+          accessToken: clientAccessToken,
+          refreshToken: clientRefreshToken
+        }
+      });
+    } catch (err) {
+      return reply.status(401).send({ success: false, error: { message: 'Invalid or expired exchange token' } });
     }
   });
 
   // POST /auth/login/verify-2fa
-  fastify.post('/login/verify-2fa', async (request, reply) => {
+  fastify.post('/login/verify-2fa', {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '5 minutes',
+        errorResponseBuilder: (request, context) => ({
+          success: false,
+          error: {
+            code: 'TOO_MANY_REQUESTS',
+            message: `Too many 2FA verification attempts. Please try again in ${context.after}.`
+          }
+        })
+      }
+    }
+  }, async (request, reply) => {
     const parse = verify2faSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({
@@ -1061,7 +1219,22 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   });
 
   // POST /auth/2fa/setup (Authenticated)
-  fastify.post('/2fa/setup', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
+  fastify.post('/2fa/setup', { 
+    preHandler: [fastify.authenticate as any],
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '5 minutes',
+        errorResponseBuilder: (request, context) => ({
+          success: false,
+          error: {
+            code: 'TOO_MANY_REQUESTS',
+            message: `Too many 2FA setup attempts. Please try again in ${context.after}.`
+          }
+        })
+      }
+    }
+  }, async (request: any, reply) => {
     const userId = request.user.sub;
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -1091,7 +1264,22 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   });
 
   // POST /auth/2fa/enable (Authenticated)
-  fastify.post('/2fa/enable', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
+  fastify.post('/2fa/enable', { 
+    preHandler: [fastify.authenticate as any],
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '5 minutes',
+        errorResponseBuilder: (request, context) => ({
+          success: false,
+          error: {
+            code: 'TOO_MANY_REQUESTS',
+            message: `Too many 2FA enable attempts. Please try again in ${context.after}.`
+          }
+        })
+      }
+    }
+  }, async (request: any, reply) => {
     const parse = enable2faSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({
@@ -1134,7 +1322,22 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   });
 
   // POST /auth/2fa/disable (Authenticated)
-  fastify.post('/2fa/disable', { preHandler: [fastify.authenticate as any] }, async (request: any, reply) => {
+  fastify.post('/2fa/disable', { 
+    preHandler: [fastify.authenticate as any],
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '5 minutes',
+        errorResponseBuilder: (request, context) => ({
+          success: false,
+          error: {
+            code: 'TOO_MANY_REQUESTS',
+            message: `Too many 2FA disable attempts. Please try again in ${context.after}.`
+          }
+        })
+      }
+    }
+  }, async (request: any, reply) => {
     const parse = disable2faSchema.safeParse(request.body);
     if (!parse.success) {
       return reply.status(400).send({

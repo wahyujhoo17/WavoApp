@@ -42,6 +42,10 @@ export async function adminRoutes(fastify: FastifyInstance) {
               id: true,
               name: true,
               status: true,
+              phoneNumber: true,
+              dailyMessageCount: true,
+              createdAt: true,
+              updatedAt: true,
             },
           },
         },
@@ -183,6 +187,76 @@ export async function adminRoutes(fastify: FastifyInstance) {
         error: {
           code: 'INTERNAL_ERROR',
           message: 'Failed to update user plan tier.',
+        },
+      });
+    }
+  });
+
+  // 3.5 GET /api/v1/admin/services/:serviceId/logs - Retrieve message logs for a specific service (Admin only)
+  fastify.get('/services/:serviceId/logs', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { serviceId } = request.params as any;
+    const { status, direction, cursor } = request.query as any;
+    const limit = Math.min(Number((request.query as any).limit) || 50, 100);
+
+    try {
+      const service = await prisma.whatsAppService.findUnique({
+        where: { id: serviceId, deletedAt: null },
+      });
+
+      if (!service) {
+        return reply.status(404).send({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'WhatsApp Service not found.' },
+        });
+      }
+
+      let skip = 0;
+      let cursorObj: any = undefined;
+
+      if (cursor) {
+        skip = 1;
+        cursorObj = { id: cursor };
+      }
+
+      const logs = await prisma.messageLog.findMany({
+        where: {
+          serviceId,
+          status: status ? status : undefined,
+          direction: direction ? direction : undefined,
+        },
+        take: limit,
+        skip,
+        cursor: cursorObj,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      });
+
+      const hasMore = logs.length === limit;
+      const nextCursor = hasMore ? logs[logs.length - 1].id.toString() : null;
+
+      const serializedLogs = logs.map((log) => ({
+        ...log,
+        id: log.id.toString(),
+        queueJobId: log.queueJobId || null,
+        webhookDeliveredAt: log.webhookDeliveredAt || null,
+      }));
+
+      return reply.status(200).send({
+        success: true,
+        data: serializedLogs,
+        pagination: {
+          cursor: cursor || null,
+          nextCursor,
+          hasMore,
+          limit,
+        },
+      });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to retrieve service logs.',
         },
       });
     }
