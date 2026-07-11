@@ -505,7 +505,7 @@ export default function DashboardLayout({
             </button>
             {!isMinimized ? (
               <div className="px-2 pt-4 pb-2">
-                <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wider bg-white/5 px-2 py-1 rounded-md border border-white/10">v2.1 Beta</span>
+                <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wider">v2.1 Beta</span>
               </div>
             ) : (
               <div className="flex justify-center pt-4 pb-2">
