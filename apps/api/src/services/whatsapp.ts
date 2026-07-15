@@ -222,10 +222,31 @@ export class WhatsAppServiceManager {
 
       for (const msg of m.messages) {
         if (!msg.key.fromMe && msg.message) {
-          // In some cases (like Communities or masked LIDs), the real number is in senderPn
-          const senderJid = (msg.key as any).senderPn || msg.key.participant || msg.key.remoteJid;
-          const from = senderJid?.split('@')[0] || '';
+          // Resolve real phone number from LID
+          // Priority: senderPn > remoteJidAlt > participantAlt > participant > remoteJid
+          const keyAny = msg.key as any;
+          let senderJid = 
+            keyAny.senderPn ||              // Baileys v6+: real phone in senderPn
+            keyAny.remoteJidAlt ||           // Baileys v7: alt field with real number
+            keyAny.participantAlt ||         // Baileys v7: group participant alt
+            msg.key.participant ||           // Group messages
+            msg.key.remoteJid ||             // Direct messages
+            '';
           
+          // If we still got a LID (@lid), try to extract phone from pushName or notify
+          // Strip the @s.whatsapp.net or @lid suffix
+          let from = senderJid.split('@')[0] || '';
+          
+          // Log all available key fields for debugging
+          console.log(`[WA Engine] Incoming message key data:`, JSON.stringify({
+            remoteJid: msg.key.remoteJid,
+            senderPn: keyAny.senderPn,
+            remoteJidAlt: keyAny.remoteJidAlt,
+            participantAlt: keyAny.participantAlt,
+            participant: msg.key.participant,
+            resolvedFrom: from
+          }));
+
           // Also capture the group ID if it's from a group
           const isGroup = msg.key.remoteJid?.endsWith('@g.us');
           const groupId = isGroup ? msg.key.remoteJid?.split('@')[0] : null;
@@ -234,7 +255,6 @@ export class WhatsAppServiceManager {
           
           if (!body) continue;
 
-          console.log(`[WA Engine] Incoming message key data:`, JSON.stringify(msg.key));
           console.log(`[WA Engine] Incoming message from ${from}: ${body}`);
 
           // Trigger webhook for incoming message
