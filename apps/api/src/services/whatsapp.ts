@@ -148,7 +148,10 @@ export class WhatsAppServiceManager {
 
       if (connection === 'close') {
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        
+        // If it timed out while waiting for QR scan
+        const isQrTimeout = statusCode === DisconnectReason.timedOut && this.qrCodes.has(serviceId);
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut && !isQrTimeout;
 
         console.log(`[WA Engine] Connection closed for ${slug}. Status code: ${statusCode}. Reconnecting: ${shouldReconnect}`);
         
@@ -169,23 +172,25 @@ export class WhatsAppServiceManager {
             });
           }, 5000);
         } else {
-          // Logged out
-          console.log(`[WA Engine] Service ${slug} logged out. Deleting credentials...`);
+          // Logged out or QR scan timeout (1 minute)
+          console.log(`[WA Engine] Service ${slug} stopped. Reason: ${isQrTimeout ? 'QR Timeout' : 'Logged Out'}`);
           
           await prisma.whatsAppService.update({
             where: { id: serviceId },
             data: { 
               status: ServiceStatus.INACTIVE,
-              phoneNumber: null
+              ...(isQrTimeout ? {} : { phoneNumber: null }) // only clear phone number if actually logged out
             }
           });
           this.broadcast(serviceId, 'service:status', { serviceId, status: ServiceStatus.INACTIVE });
 
-          // Clean up auth files
-          try {
-            await fs.rm(localAuthPath, { recursive: true, force: true });
-          } catch (err) {
-            console.error('[WA Engine] Error cleaning up auth folder:', err);
+          // Clean up auth files only if logged out, not if just QR timeout
+          if (!isQrTimeout) {
+            try {
+              await fs.rm(localAuthPath, { recursive: true, force: true });
+            } catch (err) {
+              console.error('[WA Engine] Error cleaning up auth folder:', err);
+            }
           }
         }
       }
@@ -209,6 +214,7 @@ export class WhatsAppServiceManager {
           
           if (!body) continue;
 
+          console.log(`[WA Engine] Incoming message key data:`, JSON.stringify(msg.key));
           console.log(`[WA Engine] Incoming message from ${from}: ${body}`);
 
           // Trigger webhook for incoming message
