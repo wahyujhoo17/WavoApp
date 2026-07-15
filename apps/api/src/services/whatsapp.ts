@@ -4,7 +4,8 @@ import makeWASocket, {
   WASocket,
   fetchLatestBaileysVersion,
   delay,
-  makeCacheableSignalKeyStore
+  makeCacheableSignalKeyStore,
+  proto
 } from '@whiskeysockets/baileys';
 import { prisma, ServiceStatus } from 'database';
 import { nanoid } from 'nanoid';
@@ -23,6 +24,8 @@ export class WhatsAppServiceManager {
   private activeSockets: Map<string, WASocket> = new Map();
   private qrCodes: Map<string, string> = new Map();
   private socketIO: SocketServer | null = null;
+  // Store sent messages so WhatsApp retries can find the original content
+  private sentMessages: Map<string, proto.IMessage> = new Map();
 
   private constructor() {}
 
@@ -109,7 +112,12 @@ export class WhatsAppServiceManager {
       markOnlineOnConnect: true,
       generateHighQualityLinkPreview: false,
       getMessage: async (key) => {
-        return { conversation: 'Wavo API Message' };
+        const msgId = key.id;
+        if (msgId && this.sentMessages.has(msgId)) {
+          return this.sentMessages.get(msgId)!;
+        }
+        // Fallback: return empty so Baileys doesn't crash
+        return { conversation: '' };
       }
     });
 
@@ -313,6 +321,14 @@ export class WhatsAppServiceManager {
     }
 
     const result = await sock.sendMessage(jid, { text });
+
+    // Store sent message for retry handling
+    if (result?.key.id) {
+      this.sentMessages.set(result.key.id, result.message!);
+      // Auto-cleanup after 10 minutes to prevent memory leak
+      setTimeout(() => this.sentMessages.delete(result.key.id!), 10 * 60 * 1000);
+    }
+
     return result?.key.id || 'sent_fallback';
   }
 
@@ -330,6 +346,12 @@ export class WhatsAppServiceManager {
       image: imageBuffer,
       caption: caption
     });
+
+    // Store sent message for retry handling
+    if (result?.key.id) {
+      this.sentMessages.set(result.key.id, result.message!);
+      setTimeout(() => this.sentMessages.delete(result.key.id!), 10 * 60 * 1000);
+    }
 
     return result?.key.id || 'sent_fallback';
   }
