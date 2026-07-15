@@ -3,7 +3,8 @@ import makeWASocket, {
   useMultiFileAuthState,
   WASocket,
   fetchLatestBaileysVersion,
-  delay
+  delay,
+  makeCacheableSignalKeyStore
 } from '@whiskeysockets/baileys';
 import { prisma, ServiceStatus } from 'database';
 import { nanoid } from 'nanoid';
@@ -97,8 +98,13 @@ export class WhatsAppServiceManager {
     const sock = makeWASocket({
       version,
       printQRInTerminal: false,
-      auth: state,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, console as any),
+      },
       browser: ['Wavo Platform', 'Chrome', '1.0.0'],
+      syncFullHistory: false,
+      markOnlineOnConnect: false,
     });
 
     this.activeSockets.set(serviceId, sock);
