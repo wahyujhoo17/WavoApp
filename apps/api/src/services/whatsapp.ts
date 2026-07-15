@@ -15,7 +15,7 @@ import { storageService } from './storage.js';
 import { dispatchWebhook } from './queue.js';
 import { encrypt, decrypt } from '../utils/crypto.js';
 import { Server as SocketServer } from 'socket.io';
-
+import pino from 'pino';
 const SESSION_DIR = path.resolve(process.cwd(), 'storage/sessions');
 
 export class WhatsAppServiceManager {
@@ -95,12 +95,14 @@ export class WhatsAppServiceManager {
     const { state, saveCreds } = await useMultiFileAuthState(localAuthPath);
     const { version } = await fetchLatestBaileysVersion();
 
+    const logger = pino({ level: 'silent' });
     const sock = makeWASocket({
       version,
       printQRInTerminal: false,
+      logger,
       auth: {
         creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, console as any),
+        keys: makeCacheableSignalKeyStore(state.keys, logger),
       },
       browser: ['Wavo Platform', 'Chrome', '1.0.0'],
       syncFullHistory: false,
