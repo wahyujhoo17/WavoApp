@@ -202,8 +202,8 @@ export class WhatsAppServiceManager {
 
       for (const msg of m.messages) {
         if (!msg.key.fromMe && msg.message) {
-          // In groups, remoteJid is the group ID and participant is the actual sender
-          const senderJid = msg.key.participant || msg.key.remoteJid;
+          // In some cases (like Communities or masked LIDs), the real number is in senderPn
+          const senderJid = (msg.key as any).senderPn || msg.key.participant || msg.key.remoteJid;
           const from = senderJid?.split('@')[0] || '';
           
           // Also capture the group ID if it's from a group
