@@ -11,6 +11,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { Boom } from '@hapi/boom';
 import { storageService } from './storage.js';
+import { dispatchWebhook } from './queue.js';
 import { encrypt, decrypt } from '../utils/crypto.js';
 import { Server as SocketServer } from 'socket.io';
 
@@ -209,6 +210,13 @@ export class WhatsAppServiceManager {
           if (!body) continue;
 
           console.log(`[WA Engine] Incoming message from ${from}: ${body}`);
+
+          // Trigger webhook for incoming message
+          dispatchWebhook(serviceId, 'message.received', {
+            from,
+            message: body,
+            timestamp: new Date()
+          }).catch(err => console.error('[WA Engine] Error dispatching webhook:', err));
 
           // Broadcast message event
           this.broadcast(serviceId, 'service:message', {
