@@ -19,8 +19,9 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY packages/database/package.json ./packages/database/package.json
 
-# 3. Install ALL dependencies (workspace-aware) from the lock file
-RUN npm ci --include=dev
+# 3. Install ALL dependencies (workspace-aware)
+# Use 'npm install' to resolve updated Baileys v7
+RUN npm install --include=dev
 
 # 4. Copy workspace sources
 COPY packages/database ./packages/database
@@ -54,7 +55,8 @@ COPY apps/api/package.json ./apps/api/package.json
 COPY packages/database/package.json ./packages/database/package.json
 
 # Install production-only deps (workspace-aware)
-RUN npm ci --omit=dev --workspace=apps/api --workspace=packages/database
+# Use 'npm install' to resolve updated Baileys v7
+RUN npm install --omit=dev --workspace=apps/api --workspace=packages/database
 
 # Copy built artifacts
 COPY --from=builder /build/apps/api/dist ./apps/api/dist
