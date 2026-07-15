@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "database";
 import crypto from "crypto";
 import { nanoid } from "nanoid";
+import { dispatchWebhook } from "../services/queue.js";
 
 const logsQuerySchema = z.object({
   serviceId: z.string().uuid(),
@@ -445,25 +446,16 @@ export const logsRoutes: FastPluginAsync = async (fastify: FastifyInstance) => {
       });
     }
 
-    const delivery = await prisma.webhookDeliveryLog.create({
-      data: {
-        id: `wdl_${nanoid(10)}`,
-        webhookId: webhook.id,
-        event: "test.ping",
-        payload: { ping: true, timestamp: new Date() },
-        responseStatus: 200,
-        responseBody: '{"status":"ok"}',
-        duration: 120,
-        status: "SUCCESS",
-        attempts: 1,
-      },
+    // Dispatch a real test webhook ping to the queue
+    await dispatchWebhook(serviceId, "test.ping", {
+      ping: true,
+      timestamp: new Date()
     });
 
     return reply.status(200).send({
       success: true,
       data: {
-        message: "Test ping logged successfully",
-        id: delivery.id.toString(),
+        message: "Test ping dispatched successfully to queue",
       },
     });
   });
