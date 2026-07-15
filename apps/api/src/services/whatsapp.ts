@@ -107,6 +107,10 @@ export class WhatsAppServiceManager {
       browser: ['Wavo Platform', 'Chrome', '1.0.0'],
       syncFullHistory: false,
       markOnlineOnConnect: false,
+      generateHighQualityLinkPreview: false,
+      getMessage: async (key) => {
+        return { conversation: 'Wavo API Message' };
+      }
     });
 
     this.activeSockets.set(serviceId, sock);
