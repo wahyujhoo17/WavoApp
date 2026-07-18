@@ -95,13 +95,14 @@ function VerifyEmailContent() {
             <input 
               type="email" 
               required
+              readOnly
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
                 if (error) setError(null);
               }}
               placeholder="dev@example.com"
-              className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none focus:border-primary/40 transition-all"
+              className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 text-white/60 text-sm focus:outline-none focus:border-primary/40 transition-all cursor-not-allowed select-none"
             />
           </div>
 
