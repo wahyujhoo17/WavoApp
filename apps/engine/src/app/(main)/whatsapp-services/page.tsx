@@ -447,6 +447,11 @@ export default function WhatsAppServicesPage() {
   const [newWebhookUrl, setNewWebhookUrl] = React.useState('');
   const [editServiceName, setEditServiceName] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchServices = async () => {
     setIsLoading(true);
@@ -637,7 +642,7 @@ export default function WhatsAppServicesPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-[#cfbcff]/10 text-[#cfbcff] border border-[#cfbcff]/20">
-                      <Play size={20} />
+                      <Edit3 size={20} />
                     </div>
                     <h3 className="text-[18px] font-bold text-white tracking-tight">Edit Service</h3>
                   </div>

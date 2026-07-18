@@ -969,8 +969,10 @@ export default function AdminDashboardPage() {
               )}
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
