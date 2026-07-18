@@ -116,8 +116,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
 
     if (res.success && res.data) {
-      toast.success("Account Created", "Developer account successfully registered! Please sign in.");
-      router.push('/login');
+      toast.success("Account Created", "Developer account successfully registered! Please check your email for the verification code.");
+      router.push('/verify-email?email=' + encodeURIComponent(email));
       return { success: true };
     } else {
       const errMsg = res.error?.message || "An error occurred during sign up.";
