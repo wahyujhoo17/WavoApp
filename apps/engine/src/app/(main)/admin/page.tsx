@@ -642,24 +642,13 @@ export default function AdminDashboardPage() {
       {/* Create User Modal */}
       <AnimatePresence>
         {isAddModalOpen && (
-          <>
-            {/* Overlay */}
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
             <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsAddModalOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
-            />
-            
-            {/* Modal Card */}
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="w-full max-w-[500px] max-h-[85vh] bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl p-6 md:p-8 overflow-y-auto custom-scrollbar flex flex-col gap-6 pointer-events-auto"
-              >
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
+            >
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-[22px] font-bold text-white tracking-tight">Create User</h3>
@@ -772,27 +761,18 @@ export default function AdminDashboardPage() {
                 </div>
               </form>
               </motion.div>
-            </div>
-          </>
+          </div>
         )}
 
         {/* User Services Modal */}
         {selectedUserForServices && !selectedServiceForLogs && (
-          <>
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
             <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedUserForServices(null)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
-            />
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="w-full max-w-[800px] max-h-[85vh] bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl p-6 md:p-8 flex flex-col gap-6 pointer-events-auto"
-              >
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[800px] w-full overflow-hidden shadow-2xl p-8 flex flex-col gap-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
+            >
               <div className="flex justify-between items-center shrink-0">
                 <div>
                   <h3 className="text-[22px] font-bold text-white tracking-tight flex items-center gap-2">
@@ -847,25 +827,17 @@ export default function AdminDashboardPage() {
                 )}
               </div>
               </motion.div>
-            </div>
-          </>
+          </div>
         )}
 
         {/* Admin Logs Modal */}
         {selectedServiceForLogs && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeLogsModal}
-              className="fixed inset-0 bg-black/70 backdrop-blur-md z-[120]"
-            />
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed inset-x-4 top-[5%] bottom-[5%] md:left-[10%] md:right-[10%] bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl flex flex-col z-[130] overflow-hidden"
+              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[1000px] w-full overflow-hidden shadow-2xl flex flex-col relative h-[calc(100vh-4rem)]"
             >
               <div className="p-6 md:p-8 border-b border-white/[0.05] flex justify-between items-center bg-black/20 shrink-0">
                 <div>
@@ -975,7 +947,7 @@ export default function AdminDashboardPage() {
                 </div>
               )}
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
     </div>

@@ -511,16 +511,11 @@ export default function ServiceDetailPage({ params }: { params: Promise<{ id: st
       {mounted && typeof document !== 'undefined' ? createPortal(
         <AnimatePresence>
           {showNewApiKey && newApiKey && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-6"
-            >
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
               <motion.div 
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
                 onClick={(e) => e.stopPropagation()}
                 className="w-full max-w-[480px] bg-[#1c1c1e] border border-white/10 rounded-[32px] p-8 shadow-2xl relative overflow-hidden space-y-6 animate-none"
               >
@@ -577,7 +572,7 @@ export default function ServiceDetailPage({ params }: { params: Promise<{ id: st
                   I've Saved My Key — Close
                 </button>
               </motion.div>
-            </motion.div>
+            </div>
           )}
         </AnimatePresence>,
         document.body
