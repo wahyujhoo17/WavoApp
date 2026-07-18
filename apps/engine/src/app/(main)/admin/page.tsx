@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -640,158 +641,169 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Create User Modal */}
-      <AnimatePresence>
-        {isAddModalOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
+      {mounted && createPortal(
+        <AnimatePresence>
+          {isAddModalOpen && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
+              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[24px] max-w-[440px] w-full overflow-hidden shadow-2xl relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
             >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-[22px] font-bold text-white tracking-tight">Create User</h3>
-                  <p className="text-[13px] text-[#8e8e93] mt-0.5 font-medium">Add a new developer account to the platform.</p>
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                    <UserCheck size={20} />
+                  </div>
+                  <h3 className="text-[18px] font-bold text-white tracking-tight">Create User</h3>
                 </div>
-                <button 
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#8e8e93] hover:text-white transition-colors"
-                >
-                  <Plus size={20} className="rotate-45" />
-                </button>
-              </div>
+                
+                <p className="text-[14px] text-[#8e8e93] leading-relaxed">
+                  Add a new developer account to the platform.
+                </p>
 
-              <form onSubmit={handleCreateUser} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Full Name</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={newUserName}
-                    onChange={(e) => setNewUserName(e.target.value)}
-                    placeholder="John Doe"
-                    className="w-full bg-black/40 border border-white/5 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/40 transition-all font-medium"
-                  />
-                </div>
+                <form onSubmit={handleCreateUser} className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Full Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      placeholder="John Doe"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-[14px] focus:outline-none focus:border-primary/50 transition-all font-medium"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Email Address</label>
-                  <input 
-                    type="email" 
-                    required
-                    value={newUserEmail}
-                    onChange={(e) => setNewUserEmail(e.target.value)}
-                    placeholder="john@example.com"
-                    className="w-full bg-black/40 border border-white/5 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/40 transition-all font-medium"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Email Address</label>
+                    <input 
+                      type="email" 
+                      required
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      placeholder="john@example.com"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-[14px] focus:outline-none focus:border-primary/50 transition-all font-medium"
+                    />
+                  </div>
 
-                <div className="space-y-2 font-sans">
-                  <div className="flex justify-between items-center px-1">
-                    <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest">Password</label>
+                  <div className="space-y-2 font-sans">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest">Password</label>
+                      <button 
+                        type="button" 
+                        onClick={generateRandomPassword}
+                        className="text-[10px] font-bold text-primary uppercase tracking-widest hover:opacity-80 transition-opacity"
+                      >
+                        Generate Secure
+                      </button>
+                    </div>
+                    <input 
+                      type="text" 
+                      required
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      placeholder="Minimum 8 characters"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-[14px] focus:outline-none focus:border-primary/50 transition-all font-medium font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Subscription Plan</label>
+                      <div className="relative">
+                        <select 
+                          value={newUserPlan}
+                          onChange={(e) => setNewUserPlan(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-white text-[14px] font-bold outline-none cursor-pointer appearance-none focus:border-primary/50 transition-all"
+                        >
+                          <option value="FREE">Free</option>
+                          <option value="PRO">Pro</option>
+                          <option value="BUSINESS">Business</option>
+                          <option value="ENTERPRISE">Enterprise</option>
+                        </select>
+                        <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8e8e93] pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Access Role</label>
+                      <div className="relative">
+                        <select 
+                          value={newUserRole}
+                          onChange={(e) => setNewUserRole(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-white text-[14px] font-bold outline-none cursor-pointer appearance-none focus:border-primary/50 transition-all"
+                        >
+                          <option value="USER">User (Standard)</option>
+                          <option value="ADMIN">Admin</option>
+                          <option value="SUPER_ADMIN">Super Admin</option>
+                        </select>
+                        <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8e8e93] pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
                     <button 
-                      type="button" 
-                      onClick={generateRandomPassword}
-                      className="text-[10px] font-bold text-primary uppercase tracking-widest hover:opacity-80 transition-opacity"
+                      type="button"
+                      onClick={() => setIsAddModalOpen(false)}
+                      className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white font-bold text-[14px] hover:bg-white/10 transition-all"
                     >
-                      Generate Secure
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 px-4 py-2.5 bg-primary text-black rounded-xl font-bold text-[14px] hover:bg-primary/90 transition-all disabled:opacity-50"
+                    >
+                      {isSubmitting ? "Creating..." : "Create User"}
                     </button>
                   </div>
-                  <input 
-                    type="text" 
-                    required
-                    value={newUserPassword}
-                    onChange={(e) => setNewUserPassword(e.target.value)}
-                    placeholder="Minimum 8 characters"
-                    className="w-full bg-black/40 border border-white/5 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/40 transition-all font-medium font-mono"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Subscription Plan</label>
-                    <div className="relative">
-                      <select 
-                        value={newUserPlan}
-                        onChange={(e) => setNewUserPlan(e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-2xl pl-4 pr-10 py-3 text-white text-sm font-bold outline-none cursor-pointer appearance-none focus:border-primary/40 transition-all"
-                      >
-                        <option value="FREE">Free</option>
-                        <option value="PRO">Pro</option>
-                        <option value="BUSINESS">Business</option>
-                        <option value="ENTERPRISE">Enterprise</option>
-                      </select>
-                      <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8e8e93] pointer-events-none" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Access Role</label>
-                    <div className="relative">
-                      <select 
-                        value={newUserRole}
-                        onChange={(e) => setNewUserRole(e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-2xl pl-4 pr-10 py-3 text-white text-sm font-bold outline-none cursor-pointer appearance-none focus:border-primary/40 transition-all"
-                      >
-                        <option value="USER">User (Standard)</option>
-                        <option value="ADMIN">Admin</option>
-                        <option value="SUPER_ADMIN">Super Admin</option>
-                      </select>
-                      <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8e8e93] pointer-events-none" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 flex gap-4">
-                  <button 
-                    type="button"
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="flex-1 py-3.5 bg-white/5 border border-white/10 rounded-2xl text-white font-bold text-sm hover:bg-white/10 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex-1 py-3.5 bg-primary/20 text-primary border border-primary/20 rounded-2xl font-bold text-sm hover:bg-primary/30 transition-all disabled:opacity-50"
-                  >
-                    {isSubmitting ? "Creating..." : "Create User"}
-                  </button>
-                </div>
-              </form>
+                </form>
+              </div>
               </motion.div>
           </div>
-        )}
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
-        {/* User Services Modal */}
-        {selectedUserForServices && !selectedServiceForLogs && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
+      {/* User Services Modal */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {selectedUserForServices && !selectedServiceForLogs && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[800px] w-full overflow-hidden shadow-2xl p-8 flex flex-col gap-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
+              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[24px] max-w-[800px] w-full overflow-hidden shadow-2xl flex flex-col relative max-h-[calc(100vh-2rem)] custom-scrollbar"
             >
-              <div className="flex justify-between items-center shrink-0">
-                <div>
-                  <h3 className="text-[22px] font-bold text-white tracking-tight flex items-center gap-2">
-                    <Smartphone className="text-[#cfbcff]" size={24} />
-                    User Services
-                  </h3>
-                  <p className="text-[13px] text-[#8e8e93] mt-0.5 font-medium">Services owned by {selectedUserForServices.fullName}</p>
+              <div className="p-6 space-y-4 shrink-0 border-b border-white/[0.05]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-[#cfbcff]/10 text-[#cfbcff] border border-[#cfbcff]/20">
+                      <Smartphone size={20} />
+                    </div>
+                    <h3 className="text-[18px] font-bold text-white tracking-tight">User Services</h3>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedUserForServices(null)}
+                    className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-[#8e8e93] hover:text-white transition-all"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => setSelectedUserForServices(null)}
-                  className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#8e8e93] hover:text-white transition-colors"
-                >
-                  <X size={20} />
-                </button>
+                
+                <p className="text-[14px] text-[#8e8e93] leading-relaxed">
+                  Services owned by <span className="text-white font-medium">{selectedUserForServices.fullName}</span>
+                </p>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar -mx-2 px-2">
+              <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
                 {selectedUserForServices.services?.length === 0 ? (
-                  <div className="py-12 text-center text-[#8e8e93] font-medium bg-black/20 rounded-[24px]">
+                  <div className="py-12 text-center text-[#8e8e93] font-[14px] bg-black/20 rounded-[16px]">
                     This user has no active WhatsApp services.
                   </div>
                 ) : (
@@ -826,33 +838,42 @@ export default function AdminDashboardPage() {
                   </div>
                 )}
               </div>
-              </motion.div>
+            </motion.div>
           </div>
-        )}
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
-        {/* Admin Logs Modal */}
-        {selectedServiceForLogs && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
+      {/* Admin Logs Modal */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {selectedServiceForLogs && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[1000px] w-full overflow-hidden shadow-2xl flex flex-col relative h-[calc(100vh-4rem)]"
+              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[24px] max-w-[1000px] w-full overflow-hidden shadow-2xl flex flex-col relative h-[calc(100vh-4rem)]"
             >
-              <div className="p-6 md:p-8 border-b border-white/[0.05] flex justify-between items-center bg-black/20 shrink-0">
-                <div>
-                  <h3 className="text-[22px] font-bold text-white tracking-tight flex items-center gap-2">
-                    <Terminal className="text-[#34C759]" size={24} />
-                    Service Logs: {selectedServiceForLogs.name}
-                  </h3>
-                  <p className="text-[13px] text-[#8e8e93] mt-0.5 font-medium font-mono">ID: {selectedServiceForLogs.id}</p>
+              <div className="p-6 space-y-4 border-b border-white/[0.05] bg-black/20 shrink-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-[#34C759]/10 text-[#34C759] border border-[#34C759]/20">
+                      <Terminal size={20} />
+                    </div>
+                    <h3 className="text-[18px] font-bold text-white tracking-tight">Service Logs: {selectedServiceForLogs.name}</h3>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedServiceForLogs(null)}
+                    className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-[#8e8e93] hover:text-white transition-all"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-                <button 
-                  onClick={closeLogsModal}
-                  className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#8e8e93] hover:text-white transition-colors"
-                >
-                  <X size={20} />
-                </button>
+                <p className="text-[14px] text-[#8e8e93] leading-relaxed font-mono">
+                  ID: {selectedServiceForLogs.id}
+                </p>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8">

@@ -548,23 +548,32 @@ export default function WhatsAppServicesPage() {
         </button>
       </div>
 
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
+      {mounted && createPortal(
+        <AnimatePresence>
+          {isModalOpen && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="w-full max-w-[400px] bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] p-8 shadow-2xl relative overflow-hidden"
+              className="w-full max-w-[440px] bg-[#1c1c1e] border border-white/[0.08] rounded-[24px] shadow-2xl relative overflow-hidden"
             >
                 {/* Background glow */}
                 <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#00c896]/10 rounded-full blur-3xl" />
                 
-                <div className="relative">
-                  <h2 className="text-[24px] font-bold text-white mb-2">Create New Service</h2>
-                  <p className="text-[14px] text-[#8e8e93] mb-8">Initialize a new WhatsApp instance for your application.</p>
+                <div className="p-6 space-y-4 relative">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-[#00c896]/10 text-[#00c896] border border-[#00c896]/20">
+                      <Plus size={20} />
+                    </div>
+                    <h3 className="text-[18px] font-bold text-white tracking-tight">Create New Service</h3>
+                  </div>
                   
-                  <div className="space-y-6">
+                  <p className="text-[14px] text-[#8e8e93] leading-relaxed">
+                    Initialize a new WhatsApp instance for your application.
+                  </p>
+                  
+                  <div className="space-y-4 pt-2">
                     <div className="space-y-2">
                       <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider block px-1">Service Name</label>
                       <input 
@@ -572,7 +581,7 @@ export default function WhatsAppServicesPage() {
                         placeholder="e.g. Support Bot"
                         value={newServiceName}
                         onChange={(e) => setNewServiceName(e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none focus:border-[#00c896]/40 transition-all font-medium"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white outline-none focus:border-[#00c896]/50 transition-all font-sans"
                       />
                     </div>
                     
@@ -583,21 +592,21 @@ export default function WhatsAppServicesPage() {
                         placeholder="https://api.example.com/wavo-webhook"
                         value={newWebhookUrl}
                         onChange={(e) => setNewWebhookUrl(e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3.5 text-white text-sm focus:outline-none focus:border-[#00c896]/40 transition-all font-mono"
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white outline-none focus:border-[#00c896]/50 transition-all font-sans"
                       />
                     </div>
 
-                    <div className="pt-4 flex gap-4">
+                    <div className="flex gap-3 pt-2">
                       <button 
                         onClick={() => setIsModalOpen(false)}
-                        className="flex-1 py-3.5 px-6 rounded-xl font-bold text-[14px] text-[#8e8e93] bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
+                        className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-bold text-[14px] transition-all"
                         disabled={isSubmitting}
                       >
                         Cancel
                       </button>
                       <button 
                         onClick={handleCreate}
-                        className="flex-1 py-3.5 px-6 rounded-xl font-bold text-[14px] text-black bg-[#00c896] hover:opacity-90 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        className="flex-1 px-4 py-2.5 rounded-xl font-bold text-[14px] transition-all text-black bg-[#00c896] hover:bg-[#00c896]/90 flex items-center justify-center gap-2"
                         disabled={isSubmitting}
                       >
                         {isSubmitting && <RefreshCw size={16} className="animate-spin" />}
@@ -608,62 +617,71 @@ export default function WhatsAppServicesPage() {
                 </div>
               </motion.div>
             </div>
-        )}
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
         
-        {/* Edit Service Modal */}
-        {isEditModalOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
+      {/* Edit Service Modal */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {isEditModalOpen && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[32px] max-w-[500px] w-full overflow-hidden shadow-2xl p-8 space-y-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
+              className="bg-[#1c1c1e] border border-white/[0.08] rounded-[24px] max-w-[440px] w-full overflow-hidden shadow-2xl relative max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
             >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-[22px] font-bold text-white tracking-tight">Edit Service</h3>
-                  <p className="text-[13px] text-[#8e8e93] mt-0.5 font-medium">Update the details of your WhatsApp service.</p>
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-[#cfbcff]/10 text-[#cfbcff] border border-[#cfbcff]/20">
+                      <Play size={20} />
+                    </div>
+                    <h3 className="text-[18px] font-bold text-white tracking-tight">Edit Service</h3>
+                  </div>
                 </div>
-                <button 
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#8e8e93] hover:text-white transition-colors"
-                >
-                  <Plus size={20} className="rotate-45" />
-                </button>
-              </div>
+                
+                <p className="text-[14px] text-[#8e8e93] leading-relaxed">
+                  Update the details of your WhatsApp service.
+                </p>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Service Name</label>
-                  <input 
-                    type="text" 
-                    value={editServiceName}
-                    onChange={(e) => setEditServiceName(e.target.value)}
-                    placeholder="e.g. Support Line"
-                    className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white text-[15px] outline-none focus:border-primary/40 transition-all font-medium"
-                  />
-                </div>
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider block px-1">Service Name</label>
+                    <input 
+                      type="text" 
+                      value={editServiceName}
+                      onChange={(e) => setEditServiceName(e.target.value)}
+                      placeholder="e.g. Support Line"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white outline-none focus:border-[#cfbcff]/50 transition-all font-sans"
+                    />
+                  </div>
 
-                <div className="pt-2 flex gap-3">
-                  <button 
-                    onClick={() => setIsEditModalOpen(false)}
-                    className="flex-1 py-4 bg-white/5 text-white border border-white/10 rounded-2xl font-bold text-[15px] hover:bg-white/10 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    onClick={handleUpdateService}
-                    disabled={isSubmitting}
-                    className="flex-1 py-4 bg-primary/20 text-primary border border-primary/20 rounded-2xl font-bold text-[15px] hover:bg-primary/30 transition-all disabled:opacity-50"
-                  >
-                    {isSubmitting ? "Saving..." : "Save Changes"}
-                  </button>
+                  <div className="flex gap-3 pt-2">
+                    <button 
+                      onClick={() => setIsEditModalOpen(false)}
+                      className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-bold text-[14px] transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={handleUpdateService}
+                      disabled={isSubmitting}
+                      className="flex-1 px-4 py-2.5 rounded-xl font-bold text-[14px] transition-all text-black bg-[#cfbcff] hover:bg-[#cfbcff]/90"
+                    >
+                      {isSubmitting ? "Saving..." : "Save Changes"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

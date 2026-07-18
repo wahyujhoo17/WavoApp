@@ -517,60 +517,62 @@ export default function ServiceDetailPage({ params }: { params: Promise<{ id: st
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.95, opacity: 0, y: 20 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-[480px] bg-[#1c1c1e] border border-white/10 rounded-[32px] p-8 shadow-2xl relative overflow-hidden space-y-6 animate-none"
+                className="w-full max-w-[480px] bg-[#1c1c1e] border border-white/[0.08] rounded-[24px] shadow-2xl relative overflow-hidden animate-none"
               >
-                {/* Background glow */}
                 <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#34C759]/5 rounded-full blur-3xl" />
                 
-                {/* Header */}
-                <div className="flex items-center gap-4 relative">
-                  <div className="p-3 bg-[#34C759]/10 border border-[#34C759]/20 rounded-2xl text-[#34C759]">
-                    <CheckCircle2 size={24} />
+                <div className="p-6 space-y-4 relative">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-[#34C759]/10 border border-[#34C759]/20 rounded-xl text-[#34C759]">
+                      <CheckCircle2 size={20} />
+                    </div>
+                    <h3 className="text-[18px] font-bold text-white tracking-tight">API Key Created</h3>
                   </div>
-                  <div>
-                    <h3 className="text-[20px] font-bold text-white tracking-tight">API Key Created</h3>
-                    <p className="text-[13px] text-[#8e8e93] font-medium mt-1">Copy this key now — you won't be able to see it again.</p>
-                  </div>
-                </div>
-
-                {/* Key Display */}
-                <div className="relative space-y-3">
-                  <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-[0.2em] block px-1">Your Secret API Key</label>
-                  <div className="flex gap-3">
-                    <input 
-                      readOnly 
-                      value={newApiKey}
-                      className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-[14px] font-mono text-white outline-none select-all transition-all focus:border-[#34C759]/30"
-                      onClick={(e) => (e.target as HTMLInputElement).select()}
-                    />
-                    <button 
-                      onClick={() => {
-                        navigator.clipboard.writeText(newApiKey);
-                        toast.success("Copied!", "Full API Key copied to clipboard.");
-                      }}
-                      className="px-5 py-3.5 bg-[#34C759] hover:bg-[#34C759]/90 rounded-xl text-black font-bold text-[14px] transition-all flex items-center gap-2 shrink-0 cursor-pointer"
-                    >
-                      <Copy size={18} />
-                      Copy
-                    </button>
-                  </div>
-                </div>
-
-                {/* Warning */}
-                <div className="flex items-start gap-3 p-4 bg-[#FFCC00]/10 border border-[#FFCC00]/20 rounded-2xl">
-                  <AlertTriangle size={20} className="text-[#FFCC00] shrink-0 mt-0.5" />
-                  <p className="text-[13px] text-[#FFCC00]/90 leading-relaxed">
-                    <strong>This is the only time the full key will be shown.</strong> Store it in a secure location like a password manager or environment variable.
+                  
+                  <p className="text-[14px] text-[#8e8e93] leading-relaxed">
+                    Copy this key now — you won't be able to see it again.
                   </p>
-                </div>
 
-                {/* Dismiss */}
-                <button 
-                  onClick={() => setShowNewApiKey(false)}
-                  className="w-full py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[14px] font-bold text-white transition-all cursor-pointer"
-                >
-                  I've Saved My Key — Close
-                </button>
+                  <div className="space-y-4 pt-2">
+                    <div className="relative space-y-2">
+                      <label className="text-[12px] font-bold text-[#8e8e93] uppercase tracking-wider block px-1">Your Secret API Key</label>
+                      <div className="flex gap-3">
+                        <input 
+                          readOnly 
+                          value={newApiKey}
+                          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] font-mono text-white outline-none select-all transition-all focus:border-[#34C759]/30"
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                        />
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(newApiKey);
+                            toast.success("Copied!", "Full API Key copied to clipboard.");
+                          }}
+                          className="px-4 py-2.5 bg-[#34C759] hover:bg-[#34C759]/90 rounded-xl text-black font-bold text-[14px] transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+                        >
+                          <Copy size={16} />
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-4 bg-[#FFCC00]/10 border border-[#FFCC00]/20 rounded-xl">
+                      <AlertTriangle size={18} className="text-[#FFCC00] shrink-0 mt-0.5" />
+                      <p className="text-[13px] text-[#FFCC00]/90 leading-relaxed">
+                        <strong>This is the only time the full key will be shown.</strong> Store it in a secure location like a password manager.
+                      </p>
+                    </div>
+
+                    <div className="pt-2">
+                      <button 
+                        onClick={() => setShowNewApiKey(false)}
+                        className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[14px] font-bold text-white transition-all cursor-pointer"
+                      >
+                        I've Saved My Key — Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             </div>
           )}
