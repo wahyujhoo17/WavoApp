@@ -156,45 +156,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       console.error('Failed to send verification email', err);
     });
 
-    // Generate tokens
-    const accessToken = fastify.jwt.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      plan: user.plan
-    });
-
-    const tokenFamily = crypto.randomUUID();
-    const refreshToken = fastify.jwt.sign({
-      sub: user.id,
-      tokenFamily
-    }, { expiresIn: '7d' });
-
-    const hashedRefreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
-
-    await prisma.session.create({
-      data: {
-        userId: user.id,
-        refreshTokenHash: hashedRefreshToken,
-        tokenFamily,
-        userAgent: request.headers['user-agent'] || null,
-        ipAddress: request.ip,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      }
-    });
-
     return reply.status(201).send({
       success: true,
       data: {
+        message: 'Registration successful. Please check your email for the verification code.',
         user: {
           id: user.id,
           email: user.email,
           fullName: user.fullName,
           role: user.role,
           plan: user.plan
-        },
-        accessToken,
-        refreshToken
+        }
       }
     });
   });
@@ -407,6 +379,16 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         error: {
           code: 'USER_SUSPENDED',
           message: 'Your account is currently suspended. Please contact support.'
+        }
+      });
+    }
+
+    if (!user.emailVerifiedAt) {
+      return reply.status(403).send({
+        success: false,
+        error: {
+          code: 'EMAIL_NOT_VERIFIED',
+          message: 'Please verify your email address before logging in.'
         }
       });
     }
