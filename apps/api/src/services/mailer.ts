@@ -44,3 +44,36 @@ export const sendResetPasswordEmail = async (to: string, resetLink: string) => {
     console.error('Error sending reset password email', error);
   }
 };
+
+export const sendVerificationOtpEmail = async (to: string, otp: string) => {
+  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
+    console.warn('SMTP configuration is missing. Email not sent.');
+    return;
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Wavo" <${env.SMTP_FROM}>`,
+      to,
+      subject: 'Verify Your Email Address',
+      text: `Your email verification code is: ${otp}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #333;">Verify Your Email Address</h2>
+          <p>Thank you for registering. Please use the verification code below to verify your email address.</p>
+          <div style="background-color: #f4f4f5; padding: 16px; border-radius: 8px; text-align: center; margin-top: 16px; margin-bottom: 16px;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #6d28d9;">${otp}</span>
+          </div>
+          <p>This code is valid for 15 minutes.</p>
+          <p>If you did not request this verification, please ignore this email.</p>
+          <br />
+          <p>Thanks,<br />The Wavo Team</p>
+        </div>
+      `,
+    });
+
+    console.log(`Verification email sent: ${info.messageId}`);
+  } catch (error) {
+    console.error('Error sending verification email', error);
+  }
+};

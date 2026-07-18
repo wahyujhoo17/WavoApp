@@ -5,7 +5,7 @@ import { prisma, UserRole, UserPlan } from 'database';
 import crypto from 'crypto';
 import { env } from '../config/env.js';
 import { generateSecret, verifyTOTP, getOTPAuthURI, generateQRCodeDataURI } from '../lib/totp.js';
-import { sendResetPasswordEmail } from '../services/mailer.js';
+import { sendResetPasswordEmail, sendVerificationOtpEmail } from '../services/mailer.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -56,6 +56,15 @@ const forgotPasswordSchema = z.object({
 const resetPasswordSchema = z.object({
   token: z.string(),
   newPassword: z.string().min(8),
+});
+
+const verifyEmailSchema = z.object({
+  email: z.string().email(),
+  otp: z.string().length(6),
+});
+
+const resendVerificationSchema = z.object({
+  email: z.string().email(),
 });
 
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -129,6 +138,24 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       }
     });
 
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await prisma.otpCode.create({
+      data: {
+        email: user.email,
+        code: otp,
+        type: 'EMAIL_VERIFICATION',
+        expiresAt,
+      }
+    });
+
+    // Send email asynchronously
+    sendVerificationOtpEmail(user.email, otp).catch(err => {
+      console.error('Failed to send verification email', err);
+    });
+
     // Generate tokens
     const accessToken = fastify.jwt.sign({
       sub: user.id,
@@ -169,6 +196,164 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         accessToken,
         refreshToken
       }
+    });
+  });
+
+  // POST /auth/verify-email
+  fastify.post('/verify-email', {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '1 minute',
+        errorResponseBuilder: (request, context) => ({
+          success: false,
+          error: {
+            code: 'TOO_MANY_REQUESTS',
+            message: `Too many verification attempts. Please try again in ${context.after}.`
+          }
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const parse = verifyEmailSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid parameters',
+          details: parse.error.format()
+        }
+      });
+    }
+
+    const { email, otp } = parse.data;
+
+    const user = await prisma.user.findFirst({
+      where: { email, deletedAt: null }
+    });
+
+    if (!user) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'User not found' }
+      });
+    }
+
+    if (user.emailVerifiedAt) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'ALREADY_VERIFIED', message: 'Email is already verified' }
+      });
+    }
+
+    const otpRecord = await prisma.otpCode.findFirst({
+      where: {
+        email,
+        code: otp,
+        type: 'EMAIL_VERIFICATION'
+      }
+    });
+
+    if (!otpRecord) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'INVALID_OTP', message: 'Invalid verification code' }
+      });
+    }
+
+    if (otpRecord.expiresAt < new Date()) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'EXPIRED_OTP', message: 'Verification code has expired' }
+      });
+    }
+
+    // Mark user as verified and delete OTP
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: new Date() }
+      }),
+      prisma.otpCode.delete({
+        where: { id: otpRecord.id }
+      })
+    ]);
+
+    return reply.status(200).send({
+      success: true,
+      data: { message: 'Email verified successfully' }
+    });
+  });
+
+  // POST /auth/resend-verification
+  fastify.post('/resend-verification', {
+    config: {
+      rateLimit: {
+        max: 3,
+        timeWindow: '5 minutes',
+        errorResponseBuilder: (request, context) => ({
+          success: false,
+          error: {
+            code: 'TOO_MANY_REQUESTS',
+            message: `Please wait ${context.after} before requesting another code.`
+          }
+        })
+      }
+    }
+  }, async (request, reply) => {
+    const parse = resendVerificationSchema.safeParse(request.body);
+    if (!parse.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid parameters',
+          details: parse.error.format()
+        }
+      });
+    }
+
+    const { email } = parse.data;
+
+    const user = await prisma.user.findFirst({
+      where: { email, deletedAt: null }
+    });
+
+    // To prevent email enumeration, we return success even if user not found or already verified
+    if (!user || user.emailVerifiedAt) {
+      return reply.status(200).send({
+        success: true,
+        data: { message: 'If the email is registered and unverified, a new code has been sent.' }
+      });
+    }
+
+    // Invalidate old OTPs for this email (optional, or just delete them)
+    await prisma.otpCode.deleteMany({
+      where: { email, type: 'EMAIL_VERIFICATION' }
+    });
+
+    // Generate new OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await prisma.otpCode.create({
+      data: {
+        email,
+        code: otp,
+        type: 'EMAIL_VERIFICATION',
+        expiresAt,
+      }
+    });
+
+    // Send email asynchronously
+    sendVerificationOtpEmail(email, otp).catch(err => {
+      console.error('Failed to resend verification email', err);
+    });
+
+    return reply.status(200).send({
+      success: true,
+      data: { message: 'If the email is registered and unverified, a new code has been sent.' }
     });
   });
 
