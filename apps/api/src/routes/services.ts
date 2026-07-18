@@ -9,6 +9,10 @@ const createServiceSchema = z.object({
   webhookUrl: z.string().url().optional(),
 });
 
+const updateServiceSchema = z.object({
+  name: z.string().min(2),
+});
+
 export const serviceRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Apply JWT authentication globally to all service routes
   fastify.addHook('preHandler', fastify.authenticate as any);

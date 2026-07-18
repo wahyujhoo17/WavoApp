@@ -46,11 +46,13 @@ interface WhatsAppService {
 const ServiceCard = ({ 
   service, 
   onDelete, 
-  onUpdate 
+  onUpdate,
+  onEdit
 }: { 
   service: WhatsAppService; 
   onDelete: () => void; 
   onUpdate: (id: string, updates: Partial<WhatsAppService>) => void; 
+  onEdit: (service: WhatsAppService) => void;
 }) => {
   const { id, name, status, phoneNumber } = service;
   const router = useRouter();
@@ -260,7 +262,10 @@ const ServiceCard = ({
                   <Eye size={16} className="text-[#8e8e93]" />
                   View Details
                 </button>
-                <button className="w-full flex items-center gap-3 px-4 py-2.5 text-[14px] text-white hover:bg-white/5 transition-colors text-left">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setShowDropdown(false); onEdit(service); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-[14px] text-white hover:bg-white/5 transition-colors text-left"
+                >
                   <Edit3 size={16} className="text-[#8e8e93]" />
                   Edit Service
                 </button>
@@ -435,9 +440,12 @@ const SkeletonCard = () => (
 export default function WhatsAppServicesPage() {
   const [services, setServices] = React.useState<WhatsAppService[]>([]);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+  const [editingService, setEditingService] = React.useState<WhatsAppService | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [newServiceName, setNewServiceName] = React.useState('');
   const [newWebhookUrl, setNewWebhookUrl] = React.useState('');
+  const [editServiceName, setEditServiceName] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const fetchServices = async () => {
@@ -478,7 +486,39 @@ export default function WhatsAppServicesPage() {
       setNewWebhookUrl('');
       setIsModalOpen(false);
     } else {
-      toast.error("Creation Failed", res.error?.message || "Failed to initialize new service.");
+      toast.error("Creation Failed", res.error?.message || "Could not initialize WhatsApp service.");
+    }
+  };
+
+  const handleEditClick = (service: WhatsAppService) => {
+    setEditingService(service);
+    setEditServiceName(service.name);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateService = async () => {
+    if (!editingService) return;
+    if (!editServiceName.trim()) {
+      toast.error("Validation Error", "Please provide a valid service name.");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    const res = await apiFetch<WhatsAppService>(`/services/${editingService.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: editServiceName
+      })
+    });
+    
+    setIsSubmitting(false);
+    if (res.success && res.data) {
+      toast.success("Service Updated", "WhatsApp service name updated successfully.");
+      setServices(services.map(s => s.id === editingService.id ? { ...s, name: res.data!.name } : s));
+      setIsEditModalOpen(false);
+      setEditingService(null);
+    } else {
+      toast.error("Update Failed", res.error?.message || "Could not update WhatsApp service.");
     }
   };
 
@@ -578,6 +618,69 @@ export default function WhatsAppServicesPage() {
             </motion.div>
           </>
         )}
+        
+        {/* Edit Service Modal */}
+        {isEditModalOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEditModalOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+            />
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 pointer-events-none">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="w-full max-w-[500px] max-h-[85vh] overflow-y-auto custom-scrollbar bg-[#1c1c1e] border border-white/10 rounded-[32px] shadow-2xl p-6 md:p-8 flex flex-col gap-6 pointer-events-auto"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-[22px] font-bold text-white tracking-tight">Edit Service</h3>
+                    <p className="text-[13px] text-[#8e8e93] mt-0.5 font-medium">Update the details of your WhatsApp service.</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#8e8e93] hover:text-white transition-colors"
+                  >
+                    <Plus size={20} className="rotate-45" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-widest block px-1">Service Name</label>
+                    <input 
+                      type="text" 
+                      value={editServiceName}
+                      onChange={(e) => setEditServiceName(e.target.value)}
+                      placeholder="e.g. Support Line"
+                      className="w-full bg-black/40 border border-white/5 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-primary/40 transition-all font-medium"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    <button 
+                      onClick={() => setIsEditModalOpen(false)}
+                      className="flex-1 py-3.5 bg-white/5 text-white border border-white/10 rounded-2xl font-bold text-sm hover:bg-white/10 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={handleUpdateService}
+                      disabled={isSubmitting}
+                      className="flex-1 py-3.5 bg-primary/20 text-primary border border-primary/20 rounded-2xl font-bold text-sm hover:bg-primary/30 transition-all disabled:opacity-50"
+                    >
+                      {isSubmitting ? "Saving..." : "Save Changes"}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
       </AnimatePresence>
 
       {isLoading ? (
@@ -615,6 +718,7 @@ export default function WhatsAppServicesPage() {
               service={service}
               onUpdate={handleCardUpdate}
               onDelete={() => handleCardDelete(service.id)}
+              onEdit={handleEditClick}
             />
           ))}
         </div>
