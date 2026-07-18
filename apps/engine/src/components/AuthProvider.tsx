@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (isLoading) return;
 
-    const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password'];
+    const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
     const isPublicRoute = publicRoutes.includes(pathname);
 
     if (!user && !isPublicRoute) {
@@ -101,6 +101,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true };
     } else {
       const errMsg = res.error?.message || "Invalid email or password.";
+      
+      if (res.error?.code === 'EMAIL_NOT_VERIFIED') {
+        toast.error("Email Not Verified", errMsg);
+        router.push('/verify-email?email=' + encodeURIComponent(email));
+        return { success: false, error: errMsg, code: res.error?.code };
+      }
+
       toast.error("Authentication Failed", errMsg);
       return { success: false, error: errMsg, code: res.error?.code };
     }
@@ -121,6 +128,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true };
     } else {
       const errMsg = res.error?.message || "An error occurred during sign up.";
+
+      if (res.error?.code === 'EMAIL_NOT_VERIFIED') {
+        toast.error("Email Not Verified", errMsg);
+        router.push('/verify-email?email=' + encodeURIComponent(email));
+        return { success: false, error: errMsg, code: res.error?.code };
+      }
+
       toast.error("Registration Failed", errMsg);
       return { success: false, error: errMsg, code: res.error?.code };
     }

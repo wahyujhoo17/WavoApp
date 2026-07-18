@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // List of public routes that don't require authentication
-  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password'];
+  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
   const isPublicRoute = publicRoutes.includes(pathname);
   
   // Skip middleware for static assets, next.js internals, and images

@@ -103,6 +103,15 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       where: { email, deletedAt: null }
     });
     if (existingUser) {
+      if (!existingUser.emailVerifiedAt) {
+        return reply.status(403).send({
+          success: false,
+          error: {
+            code: 'EMAIL_NOT_VERIFIED',
+            message: 'This email is registered but not verified. Please verify your email.'
+          }
+        });
+      }
       return reply.status(409).send({
         success: false,
         error: {
